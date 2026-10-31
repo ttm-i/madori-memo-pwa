@@ -1,0 +1,9 @@
+{
+  "name": "floor-plan-pwa",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "node --test && node scripts/check-public-boundary.mjs"
+  }
+}
+

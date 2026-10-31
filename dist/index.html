@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#f7f3ea" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="間取りメモ" />
+    <meta name="description" content="間取りと家具寸法を端末内だけで確認するオフラインPWA" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" href="./icon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="./styles.css" />
+    <title>間取りメモ</title>
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">PRIVATE · ON DEVICE</p>
+          <h1>間取りメモ</h1>
+        </div>
+        <button id="menuButton" class="icon-button" type="button" aria-label="データメニューを開く" aria-expanded="false">•••</button>
+      </header>
+
+      <section id="statusStrip" class="status-strip" aria-live="polite">
+        <span id="connectionBadge" class="status-pill">確認中</span>
+        <span id="saveStatus">端末内に自動保存</span>
+      </section>
+
+      <nav class="tabs" aria-label="表示モード">
+        <button class="tab is-active" data-view="plan" type="button">2D</button>
+        <button class="tab" data-view="wall" type="button">壁面</button>
+        <button class="tab" data-view="three" type="button">3D</button>
+      </nav>
+
+      <main>
+        <section id="planView" class="view is-active" aria-label="2D間取り">
+          <div class="toolbar" aria-label="図面表示設定">
+            <button id="lockButton" class="tool-button is-active" type="button" aria-pressed="true">🔒 閲覧</button>
+            <button id="dimensionsButton" class="tool-button is-active" type="button" aria-pressed="true">寸法</button>
+            <label class="tool-select">表示
+              <select id="dimensionScope" aria-label="寸法の表示範囲"><option value="all">すべての寸法</option></select>
+            </label>
+            <button id="uncertaintyButton" class="tool-button is-active" type="button" aria-pressed="true">要確認</button>
+            <button id="equipmentButton" class="tool-button is-active" type="button" aria-pressed="true">設備</button>
+            <button id="furnitureLayerButton" class="tool-button is-active" type="button" aria-pressed="true">家具表示</button>
+            <button id="furnitureListButton" class="tool-button" type="button">家具一覧</button>
+            <button id="furnitureButton" class="tool-button" type="button">＋ 家具</button>
+            <button id="snapButton" class="tool-button is-active" type="button" aria-pressed="true">5cm吸着</button>
+            <button id="undoButton" class="tool-button" type="button" disabled>元に戻す</button>
+            <button id="fitButton" class="tool-button" type="button">全体</button>
+          </div>
+
+          <div id="canvasFrame" class="canvas-frame">
+            <svg id="planCanvas" viewBox="0 0 800 1100" role="img" aria-labelledby="planTitle planDescription">
+              <title id="planTitle">間取り平面図</title>
+              <desc id="planDescription">読み込んだ間取りデータを表示します</desc>
+              <g id="viewportLayer"></g>
+            </svg>
+            <div id="emptyState" class="empty-state">
+              <div class="empty-icon" aria-hidden="true">⌂</div>
+              <h2>間取りデータを読み込む</h2>
+              <p>実測データは、この端末の中だけに保存されます。</p>
+              <button id="emptyImportButton" class="primary-button" type="button">JSONを選ぶ</button>
+              <button id="sampleButton" class="text-button" type="button">架空サンプルで操作を試す</button>
+            </div>
+            <div class="scale-indicator"><span id="scaleBar"></span><b id="scaleLabel">100 cm</b></div>
+          </div>
+
+          <section class="summary-card" aria-labelledby="summaryTitle">
+            <div>
+              <p class="eyebrow">CURRENT PLAN</p>
+              <h2 id="summaryTitle">データ未読込</h2>
+            </div>
+            <dl class="summary-grid">
+              <div><dt>部屋</dt><dd id="roomCount">—</dd></div>
+              <div><dt>実測</dt><dd id="measuredCount">—</dd></div>
+              <div><dt>要確認</dt><dd id="uncertainCount">—</dd></div>
+            </dl>
+          </section>
+        </section>
+
+        <section id="wallView" class="view placeholder-view" aria-label="壁面図">
+          <p class="eyebrow">PHASE 2</p>
+          <h2>壁面図</h2>
+          <p>窓・ドア・収納の高さを、2Dと同じデータから表示する予定です。</p>
+        </section>
+
+        <section id="threeView" class="view placeholder-view" aria-label="3D表示">
+          <p class="eyebrow">PHASE 3</p>
+          <h2>3D</h2>
+          <p>未測定の天井や壁厚を仮値として区別できる形で追加します。</p>
+        </section>
+      </main>
+
+      <dialog id="dataMenu" class="sheet-dialog">
+        <form method="dialog">
+          <div class="sheet-handle" aria-hidden="true"></div>
+          <div class="sheet-heading">
+            <div><p class="eyebrow">DATA</p><h2>端末内データ</h2></div>
+            <button class="icon-button" value="close" aria-label="閉じる">×</button>
+          </div>
+          <button id="importButton" class="sheet-action" type="button"><span>JSONを読み込む</span><small>端末内に保存</small></button>
+          <button id="exportButton" class="sheet-action" type="button"><span>バックアップを書き出す</span><small>ファイルに保存</small></button>
+          <button id="resetButton" class="sheet-action danger" type="button"><span>端末内データを消去</span><small>元に戻せません</small></button>
+          <p class="privacy-note">図面と写真は外部へ送信されません。ブラウザのデータを削除すると失われるため、定期的にバックアップしてください。</p>
+        </form>
+      </dialog>
+
+      <dialog id="detailDialog" class="detail-dialog">
+        <form method="dialog">
+          <div class="sheet-heading">
+            <div><p id="detailType" class="eyebrow">DETAIL</p><h2 id="detailTitle">詳細</h2></div>
+            <button class="icon-button" value="close" aria-label="閉じる">×</button>
+          </div>
+          <div id="detailBody"></div>
+          <label id="furnitureRoomEditGroup" class="field-label detail-room-field" hidden>設置する部屋
+            <select id="furnitureRoomEdit"></select>
+          </label>
+          <div id="furnitureActions" class="detail-actions" hidden>
+            <button id="editFurnitureButton" class="secondary-button" type="button">編集</button>
+            <button id="rotateFurnitureButton" class="secondary-button" type="button">90°回転</button>
+            <button id="duplicateFurnitureButton" class="secondary-button" type="button">複製</button>
+            <button id="deleteFurnitureButton" class="secondary-button danger-button" type="button">削除</button>
+          </div>
+        </form>
+      </dialog>
+
+      <dialog id="furnitureListDialog" class="detail-dialog">
+        <form method="dialog">
+          <div class="sheet-heading">
+            <div><p class="eyebrow">FURNITURE</p><h2>家具一覧 <span id="furnitureListCount" class="heading-count">0</span></h2></div>
+            <button class="icon-button" value="close" aria-label="閉じる">×</button>
+          </div>
+          <div id="furnitureList" class="furniture-list"></div>
+        </form>
+      </dialog>
+
+      <dialog id="furnitureDialog" class="detail-dialog form-dialog">
+        <form id="furnitureForm">
+          <div class="sheet-heading">
+            <div><p class="eyebrow">FURNITURE</p><h2 id="furnitureDialogTitle">家具を追加</h2></div>
+            <button id="cancelFurnitureButton" class="icon-button" type="button" aria-label="閉じる">×</button>
+          </div>
+          <label class="field-label">種類
+            <select id="furniturePreset" name="preset">
+              <option value="custom">寸法を直接入力</option>
+              <option value="dining">ダイニングテーブル 140×80</option>
+              <option value="sofa">ソファ 180×85</option>
+              <option value="single-bed">シングルベッド 97×195</option>
+              <option value="tv-board">テレビ台 150×40</option>
+              <option value="fridge">冷蔵庫 70×70</option>
+            </select>
+          </label>
+          <label class="field-label">名前<input id="furnitureName" name="name" value="家具" maxlength="40" required /></label>
+          <div class="field-row">
+            <label class="field-label">幅（cm）<input id="furnitureWidth" name="width" type="number" min="1" max="1000" step="0.1" inputmode="decimal" required /></label>
+            <label class="field-label">奥行（cm）<input id="furnitureDepth" name="depth" type="number" min="1" max="1000" step="0.1" inputmode="decimal" required /></label>
+          </div>
+          <label class="field-label">設置する部屋<select id="furnitureRoom" name="room"></select></label>
+          <p class="form-help">選んだ部屋を基準に、部屋外判定と壁までの距離を計算します。追加後は「🔓 編集」で移動できます。</p>
+          <button id="furnitureSubmitButton" class="primary-button full-width" type="submit">追加する</button>
+        </form>
+      </dialog>
+
+      <input id="fileInput" type="file" accept="application/json,.json" hidden />
+      <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    </div>
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
+

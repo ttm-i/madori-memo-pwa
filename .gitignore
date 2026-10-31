@@ -1,0 +1,7 @@
+.openai/
+private-data/
+private-output/
+*.log
+.DS_Store
+Thumbs.db
+

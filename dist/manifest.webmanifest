@@ -1,0 +1,15 @@
+{
+  "name": "間取りメモ",
+  "short_name": "間取り",
+  "description": "間取りと家具寸法を端末内だけで確認するオフラインPWA",
+  "lang": "ja",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f7f3ea",
+  "theme_color": "#f7f3ea",
+  "icons": [
+    { "src": "./icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
+
