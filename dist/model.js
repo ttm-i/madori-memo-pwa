@@ -62,6 +62,68 @@ export function countQualities(plan) {
   };
 }
 
+function belongsToRoom(item, roomId) {
+  return item.roomId === roomId || item.roomIds?.includes(roomId);
+}
+
+export function buildElevationItems(documentData, roomId) {
+  if (!documentData?.plan || !roomId) return [];
+  const items = [];
+  const addRange = (id, name, category, bottomCm, topCm, detail = "") => {
+    if (![bottomCm, topCm].every(Number.isFinite) || topCm < bottomCm) return;
+    items.push({ id, name, category, bottomCm, topCm, detail });
+  };
+  const addMarker = (id, name, category, heightCm, detail = "") => {
+    if (!Number.isFinite(heightCm)) return;
+    items.push({ id, name, category, bottomCm: heightCm, topCm: heightCm, detail, marker: true });
+  };
+
+  for (const opening of documentData.plan.openings ?? []) {
+    if (!belongsToRoom(opening, roomId) || !Number.isFinite(opening.heightCm)) continue;
+    const isWindow = String(opening.kind ?? "").includes("window");
+    const bottomCm = isWindow ? opening.sillHeightCm ?? 0 : 0;
+    addRange(opening.id, opening.name, isWindow ? "window" : "door", bottomCm, bottomCm + opening.heightCm,
+      Number.isFinite(opening.widthCm) ? `幅 ${opening.widthCm} cm` : "");
+  }
+
+  for (const feature of documentData.plan.features ?? []) {
+    if (!belongsToRoom(feature, roomId)) continue;
+    if (Number.isFinite(feature.bottomHeightCm) && Number.isFinite(feature.topHeightCm)) {
+      addRange(feature.id, feature.name, "equipment", feature.bottomHeightCm, feature.topHeightCm);
+    }
+    if (Number.isFinite(feature.derivedInteriorHeightCm)) {
+      addRange(feature.id, feature.name, "equipment", 0, feature.derivedInteriorHeightCm,
+        Number.isFinite(feature.depthCm) ? `奥行 ${feature.depthCm} cm` : "");
+    }
+    if (Number.isFinite(feature.shelfUndersideHeightCm)) {
+      addMarker(`${feature.id}-shelf`, `${feature.name} 棚下面`, "equipment", feature.shelfUndersideHeightCm);
+    }
+    if (Number.isFinite(feature.faucetHeightCm)) {
+      addMarker(`${feature.id}-faucet`, `${feature.name} 蛇口`, "equipment", feature.faucetHeightCm);
+    }
+    if (Number.isFinite(feature.worktopHeightCm)) {
+      addMarker(`${feature.id}-worktop`, `${feature.name} 天板`, "equipment", feature.worktopHeightCm);
+      addMarker(`${feature.id}-cabinet`, `${feature.name} 吊戸棚下面`, "equipment", feature.worktopHeightCm + feature.overheadCabinetClearanceCm);
+      addMarker(`${feature.id}-hood`, `${feature.name} レンジフード下面`, "equipment", feature.worktopHeightCm + feature.rangeHoodClearanceCm);
+    }
+    if (Number.isFinite(feature.undersideHeightCm) && Number.isFinite(feature.derivedTopHeightCm)) {
+      addRange(feature.id, feature.name, "equipment", feature.undersideHeightCm, feature.derivedTopHeightCm,
+        Number.isFinite(feature.depthCm) ? `奥行 ${feature.depthCm} cm` : "");
+    }
+  }
+
+  for (const outlet of documentData.plan.electrical?.outlets ?? []) {
+    if (!belongsToRoom(outlet, roomId)) continue;
+    const heightCm = outlet.verticalPosition?.centerHeightCm ?? outlet.verticalPosition?.derivedCenterHeightCm;
+    addMarker(outlet.id, outlet.name, "outlet", heightCm, `${outlet.receptacleCount}口・プレート中心`);
+  }
+  for (const wallSwitch of documentData.plan.electrical?.switches ?? []) {
+    if (!belongsToRoom(wallSwitch, roomId)) continue;
+    addMarker(wallSwitch.id, wallSwitch.name, "switch", wallSwitch.verticalPosition?.centerHeightCm, "プレート中心");
+  }
+  return items;
+}
+
 export function rotateFurniture(furniture) {
   const centerX = furniture.x + furniture.widthCm / 2;
   const centerY = furniture.y + furniture.depthCm / 2;
@@ -212,11 +274,11 @@ export function createSamplePlan() {
         { id: "sample-room", name: "洋室", color: "#eadfea", points: [{x:60,y:540},{x:560,y:540},{x:560,y:820},{x:60,y:820}], label: {x:310,y:680}, areaLabel: "6.0帖" },
       ],
       openings: [
-        { id: "sample-window", name: "掃き出し窓", kind: "window", from: {x:350,y:820}, to: {x:520,y:820}, widthCm: 170, quality: "measured" },
-        { id: "sample-door", name: "洋室引き戸", kind: "door", from: {x:180,y:530}, to: {x:320,y:530}, widthCm: 140, quality: "measured" },
+        { id: "sample-window", name: "掃き出し窓", kind: "window", roomId: "sample-room", from: {x:350,y:820}, to: {x:520,y:820}, widthCm: 170, heightCm: 180, sillHeightCm: 0, quality: "measured" },
+        { id: "sample-door", name: "洋室引き戸", kind: "door", roomIds: ["sample-ldk", "sample-room"], from: {x:180,y:530}, to: {x:320,y:530}, widthCm: 140, heightCm: 200, quality: "measured" },
       ],
       features: [
-        { id: "sample-closet", name: "収納（仮）", kind: "closet", x:420, y:80, width:140, height:70, quality: "approximate", uncertain: true },
+        { id: "sample-closet", name: "収納（仮）", kind: "closet", roomId: "sample-ldk", x:420, y:80, width:140, height:70, derivedInteriorHeightCm: 220, shelfUndersideHeightCm: 165, quality: "approximate", uncertain: true },
       ],
       walls: [],
       furniture: [],

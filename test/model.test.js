@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { analyzeFurnitureConflicts, analyzeFurniturePlacement, countQualities, createSamplePlan, duplicateFurniture, FORMAT, getDimensionGroup, moveDimensionGuide, pointInPolygon, rectanglesOverlap, rotateFurniture, snapToGrid, updateFurniture, validatePlan } from "../dist/model.js";
+import { analyzeFurnitureConflicts, analyzeFurniturePlacement, buildElevationItems, countQualities, createSamplePlan, duplicateFurniture, FORMAT, getDimensionGroup, moveDimensionGuide, pointInPolygon, rectanglesOverlap, rotateFurniture, snapToGrid, updateFurniture, validatePlan } from "../dist/model.js";
 import { zoomTransformAround } from "../dist/renderer.js";
 
 test("sample plan conforms to the public schema", () => {
@@ -23,6 +23,16 @@ test("quality counts include uncertain room geometry", () => {
   const counts = countQualities(sample);
   assert.equal(counts.measured, 3);
   assert.equal(counts.uncertain, 3);
+});
+
+test("wall elevation items preserve measured heights without inventing a ceiling", () => {
+  const sample = createSamplePlan();
+  const items = buildElevationItems(sample, "sample-room");
+  assert.deepEqual(items.map(({ name, bottomCm, topCm }) => ({ name, bottomCm, topCm })), [
+    { name: "掃き出し窓", bottomCm: 0, topCm: 180 },
+    { name: "洋室引き戸", bottomCm: 0, topCm: 200 },
+  ]);
+  assert.equal(items.some((item) => item.name.includes("天井")), false);
 });
 
 test("furniture rotates around its center", () => {

@@ -97,10 +97,35 @@
           </section>
         </section>
 
-        <section id="wallView" class="view placeholder-view" aria-label="壁面図">
-          <p class="eyebrow">PHASE 2</p>
-          <h2>壁面図</h2>
-          <p>窓・ドア・収納の高さを、2Dと同じデータから表示する予定です。</p>
+        <section id="wallView" class="view wall-view" aria-label="壁面・高さ比較">
+          <div class="wall-heading">
+            <div>
+              <p class="eyebrow">WALL · HEIGHT</p>
+              <h2>壁面・高さ比較</h2>
+            </div>
+            <span class="unmeasured-badge">天井高 未測定</span>
+          </div>
+          <p class="wall-intro">部屋を選ぶと、ドア・窓・設備・電気プレートを床からの高さで比較できます。横方向の並びは実際の壁位置ではありません。</p>
+          <div id="wallRoomList" class="wall-room-list" aria-label="表示する部屋"></div>
+          <div id="wallEmpty" class="wall-empty">
+            <strong>高さデータがありません</strong>
+            <span>間取りJSONを読み込むと表示されます。</span>
+          </div>
+          <div id="wallCanvas" class="wall-canvas" hidden>
+            <div class="wall-scale-label">床からの高さ</div>
+            <div id="wallScale" class="wall-scale" aria-hidden="true"></div>
+            <div class="wall-scroll">
+              <div id="wallTrack" class="wall-track"></div>
+            </div>
+          </div>
+          <div id="wallLegend" class="wall-legend" hidden>
+            <span><i class="legend-door"></i>ドア</span>
+            <span><i class="legend-window"></i>窓</span>
+            <span><i class="legend-equipment"></i>設備</span>
+            <span><i class="legend-outlet"></i>コンセント</span>
+            <span><i class="legend-switch"></i>スイッチ</span>
+          </div>
+          <p id="wallCeilingNote" class="wall-note" hidden>破線は表示上限です。天井位置を示すものではありません。</p>
         </section>
 
         <section id="threeView" class="view placeholder-view" aria-label="3D表示">

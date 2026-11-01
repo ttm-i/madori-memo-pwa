@@ -1,5 +1,5 @@
 import { deleteActivePlan, loadActivePlan, saveActivePlan } from "./db.js";
-import { analyzeFurnitureConflicts, analyzeFurniturePlacement, countQualities, createSamplePlan, DIMENSION_GROUP_LABELS, duplicateFurniture, getDimensionGroup, rotateFurniture, updateFurniture, validatePlan } from "./model.js";
+import { analyzeFurnitureConflicts, analyzeFurniturePlacement, buildElevationItems, countQualities, createSamplePlan, DIMENSION_GROUP_LABELS, duplicateFurniture, getDimensionGroup, rotateFurniture, updateFurniture, validatePlan } from "./model.js";
 import { detailMarkup, PlanRenderer } from "./renderer.js";
 
 const elements = Object.fromEntries([
@@ -15,6 +15,7 @@ const elements = Object.fromEntries([
   "furnitureRoomEditGroup", "furnitureRoomEdit",
   "editFurnitureButton", "furnitureDialogTitle", "furnitureSubmitButton",
   "furnitureListButton", "furnitureListDialog", "furnitureList", "furnitureListCount",
+  "wallRoomList", "wallEmpty", "wallCanvas", "wallScale", "wallTrack", "wallLegend", "wallCeilingNote",
 ].map((id) => [id, document.getElementById(id)]));
 
 let activePlan = null;
@@ -23,6 +24,7 @@ let selectedFurnitureId = null;
 let editingFurnitureId = null;
 let locked = true;
 let dimensionGroups = new Set();
+let selectedWallRoomId = null;
 const selectableByMode = {
   view: new Set(["room", "dimension", "equipment", "furniture"]),
   edit: new Set(["furniture"]),
@@ -87,6 +89,89 @@ function updateSummary() {
   elements.uncertainCount.textContent = counts.uncertain;
 }
 
+function updateWallView(preferredRoomId = selectedWallRoomId) {
+  const rooms = activePlan?.plan.rooms ?? [];
+  const availableRooms = rooms
+    .map((room) => ({ room, items: buildElevationItems(activePlan, room.id) }))
+    .filter(({ items }) => items.length);
+  selectedWallRoomId = availableRooms.some(({ room }) => room.id === preferredRoomId)
+    ? preferredRoomId
+    : availableRooms[0]?.room.id ?? null;
+
+  const roomButtons = availableRooms.map(({ room }) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = `wall-room-button ${room.id === selectedWallRoomId ? "is-active" : ""}`;
+    button.textContent = room.name;
+    button.setAttribute("aria-pressed", String(room.id === selectedWallRoomId));
+    button.addEventListener("click", () => updateWallView(room.id));
+    return button;
+  });
+  elements.wallRoomList.replaceChildren(...roomButtons);
+
+  const selected = availableRooms.find(({ room }) => room.id === selectedWallRoomId);
+  const items = selected?.items ?? [];
+  elements.wallEmpty.hidden = items.length > 0;
+  elements.wallCanvas.hidden = items.length === 0;
+  elements.wallLegend.hidden = items.length === 0;
+  elements.wallCeilingNote.hidden = items.length === 0;
+  if (!items.length) {
+    elements.wallScale.replaceChildren();
+    elements.wallTrack.replaceChildren();
+    return;
+  }
+
+  const highest = Math.max(...items.map((item) => item.topCm));
+  const displayMaxCm = Math.max(200, Math.ceil((highest + 20) / 25) * 25);
+  const scaleMarks = [];
+  for (let height = 0; height <= displayMaxCm; height += 50) {
+    const mark = document.createElement("span");
+    mark.style.bottom = `${height / displayMaxCm * 100}%`;
+    mark.textContent = `${height}`;
+    scaleMarks.push(mark);
+  }
+  const limit = document.createElement("span");
+  limit.className = "wall-limit-label";
+  limit.style.bottom = "100%";
+  limit.textContent = `${displayMaxCm} cm（表示上限）`;
+  scaleMarks.push(limit);
+  elements.wallScale.replaceChildren(...scaleMarks);
+
+  elements.wallTrack.style.setProperty("--wall-display-max", displayMaxCm);
+  elements.wallTrack.style.width = `${Math.max(100, items.length * 92)}px`;
+  const lanes = items.map((item) => {
+    const lane = document.createElement("div");
+    lane.className = "wall-lane";
+    const shape = document.createElement("div");
+    shape.className = `wall-item wall-item-${item.category} ${item.marker ? "is-marker" : ""}`;
+    shape.style.bottom = `${item.bottomCm / displayMaxCm * 100}%`;
+    if (item.marker) {
+      shape.style.height = "3px";
+    } else {
+      shape.style.height = `${Math.max(1.5, (item.topCm - item.bottomCm) / displayMaxCm * 100)}%`;
+    }
+    const heightLabel = item.marker
+      ? `${item.topCm} cm`
+      : `${item.bottomCm}–${item.topCm} cm`;
+    shape.title = `${item.name} ${heightLabel}`;
+    const label = document.createElement("div");
+    label.className = "wall-item-label";
+    const name = document.createElement("strong");
+    name.textContent = item.name;
+    const value = document.createElement("span");
+    value.textContent = heightLabel;
+    label.append(name, value);
+    if (item.detail) {
+      const detail = document.createElement("small");
+      detail.textContent = item.detail;
+      label.append(detail);
+    }
+    lane.append(shape, label);
+    return lane;
+  });
+  elements.wallTrack.replaceChildren(...lanes);
+}
+
 function updateDimensionFilters() {
   const groups = activePlan ? [...new Set(activePlan.plan.dimensions.map(getDimensionGroup))] : [];
   const order = ["wet", "hall", "ldk", "bedroom", "balcony", "other"];
@@ -125,6 +210,7 @@ async function setActivePlan(plan, { persist = true } = {}) {
   updateUndoButton();
   renderer.render(plan);
   updateSummary();
+  updateWallView();
   updateDimensionFilters();
   requestAnimationFrame(() => renderer.fit());
   if (persist) {
@@ -261,6 +347,7 @@ document.querySelectorAll(".tab").forEach((tab) => tab.addEventListener("click",
   document.querySelectorAll(".tab").forEach((item) => item.classList.toggle("is-active", item === tab));
   document.querySelectorAll(".view").forEach((view) => view.classList.remove("is-active"));
   document.getElementById(`${tab.dataset.view}View`).classList.add("is-active");
+  if (tab.dataset.view === "wall") updateWallView();
 }));
 
 elements.menuButton.addEventListener("click", () => elements.dataMenu.showModal());
@@ -421,6 +508,7 @@ elements.undoButton.addEventListener("click", async () => {
   activePlan = history.pop();
   renderer.render(activePlan);
   updateSummary();
+  updateWallView();
   updateUndoButton();
   await persistActivePlan();
   showToast("直前の変更を戻しました");
@@ -432,6 +520,7 @@ elements.resetButton.addEventListener("click", async () => {
   history.length = 0;
   renderer.render(null);
   updateSummary();
+  updateWallView();
   updateDimensionFilters();
   updateUndoButton();
   elements.dataMenu.close();
