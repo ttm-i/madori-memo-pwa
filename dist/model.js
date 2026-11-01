@@ -297,6 +297,48 @@ export function updateFurniture(furniture, values) {
   return furniture;
 }
 
+export function fitsRectangle(sides, widthCm, heightCm) {
+  if (!Array.isArray(sides) || sides.length !== 3 || !sides.every((value) => Number.isFinite(value) && value > 0)
+    || !Number.isFinite(widthCm) || !Number.isFinite(heightCm)) return null;
+  for (let first = 0; first < sides.length; first += 1) {
+    for (let second = first + 1; second < sides.length; second += 1) {
+      if ((sides[first] <= widthCm && sides[second] <= heightCm)
+        || (sides[second] <= widthCm && sides[first] <= heightCm)) return true;
+    }
+  }
+  return false;
+}
+
+export function analyzeDeliveryRoute(furniture, documentData) {
+  const route = documentData?.plan?.accessRoute;
+  const dimensions = furniture?.deliveryDimensions;
+  const sides = [dimensions?.sideACm, dimensions?.sideBCm, dimensions?.sideCCm];
+  if (!route || !sides.every((value) => Number.isFinite(value) && value > 0)) {
+    return { status: "missing", sides: null, checks: [], limitations: route?.limitations ?? [] };
+  }
+  const checks = [];
+  const addCheck = (id, label, result, detail) => checks.push({ id, label, status: result == null ? "unknown" : result ? "pass" : "review", detail });
+  const corridorWidth = route.commonCorridor?.widthCm;
+  addCheck("corridor", "共用廊下", Number.isFinite(corridorWidth) ? Math.min(...sides) <= corridorWidth : null,
+    Number.isFinite(corridorWidth) ? `幅 ${corridorWidth} cm（曲がり角は未判定）` : "幅未登録");
+  const elevator = route.elevator ?? {};
+  addCheck("elevator-opening", "エレベーター入口", fitsRectangle(sides, elevator.openingWidthCm, elevator.openingHeightCm),
+    Number.isFinite(elevator.openingWidthCm) && Number.isFinite(elevator.openingHeightCm) ? `${elevator.openingWidthCm} × ${elevator.openingHeightCm} cm` : "寸法未登録");
+  addCheck("elevator-cabin", "エレベーター庫内", fitsRectangle(sides, elevator.cabinWidthCm, elevator.cabinDepthCm),
+    Number.isFinite(elevator.cabinWidthCm) && Number.isFinite(elevator.cabinDepthCm) ? `床面 ${elevator.cabinWidthCm} × ${elevator.cabinDepthCm} cm（庫内高さは未測定）` : "寸法未登録");
+  const entranceOpening = documentData.plan.openings?.find((opening) => opening.id === route.dwellingEntranceOpeningId);
+  const entranceWidth = route.dwellingEntrance?.openingWidthCm ?? entranceOpening?.clearOpeningWidthCm ?? entranceOpening?.widthCm;
+  const entranceHeight = route.dwellingEntrance?.openingHeightCm ?? entranceOpening?.heightCm;
+  addCheck("entrance", "住戸玄関", fitsRectangle(sides, entranceWidth, entranceHeight),
+    Number.isFinite(entranceWidth) && Number.isFinite(entranceHeight) ? `${entranceWidth} × ${entranceHeight} cm` : "寸法未登録");
+  return {
+    status: checks.every((check) => check.status === "pass") ? "candidate" : "review",
+    sides,
+    checks,
+    limitations: route.limitations ?? [],
+  };
+}
+
 export function snapToGrid(value, gridCm = 5) {
   return Math.round(value / gridCm) * gridCm;
 }
@@ -423,6 +465,13 @@ export function createSamplePlan() {
         { id: "sample-closet", name: "収納（仮）", kind: "closet", roomId: "sample-ldk", elevationWallId: "sample-ldk-wall-0", elevationOffsetCm: 360, elevationWidthCm: 140, x:420, y:80, width:140, height:70, derivedInteriorHeightCm: 220, shelfUndersideHeightCm: 165, quality: "approximate", placementQuality: "approximate", uncertain: true },
         { id: "sample-kitchen", name: "サンプルキッチン", kind: "kitchen", roomId: "sample-ldk", x:70, y:450, width:200, height:55, overallWidthCm:200, overallDepthCm:55, worktopHeightCm:85, horizontalSegmentsCm:{stoveToLeftEdge:10,stoveWidth:50,sinkToStove:40,sinkWidth:80,rightEdgeToSink:20,total:200}, depthDetailsCm:{stoveDepth:45,stoveToWall:3,sinkDepth:44,sinkToWall:4}, quality:"measured", placementQuality:"confirmed" },
       ],
+      accessRoute: {
+        purpose: "delivery-feasibility",
+        commonCorridor: { widthCm: 125, quality: "measured" },
+        elevator: { openingWidthCm: 85, openingHeightCm: 200, cabinWidthCm: 100, cabinDepthCm: 150, quality: "measured" },
+        dwellingEntrance: { openingWidthCm: 90, openingHeightCm: 195, quality: "measured" },
+        limitations: ["曲がり角とエレベーター前の余地は未測定", "数値上の比較であり搬入可否を保証しない"],
+      },
       walls: [],
       electrical: {
         measurementPoint: "plate-center",
@@ -434,7 +483,9 @@ export function createSamplePlan() {
         ],
         omittedFromDrawing: [],
       },
-      furniture: [],
+      furniture: [
+        { id:"sample-sofa", name:"サンプルソファ", roomId:"sample-ldk", x:300, y:300, widthCm:180, depthCm:85, deliveryDimensions:{sideACm:80,sideBCm:45,sideCCm:190,basis:"packed"}, quality:"measured" },
+      ],
       dimensions: [
         { id: "sample-d1", label: "500", valueCm: 500, from: {x:60,y:35}, to: {x:560,y:35}, offset: 0, quality: "measured" },
         { id: "sample-d2", label: "280（仮）", valueCm: 280, from: {x:590,y:540}, to: {x:590,y:820}, offset: 0, quality: "approximate", uncertain: true },

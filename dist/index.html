@@ -31,6 +31,7 @@
       <nav class="tabs" aria-label="表示モード">
         <button class="tab is-active" data-view="plan" type="button">2D</button>
         <button class="tab" data-view="wall" type="button">壁面</button>
+        <button class="tab" data-view="delivery" type="button">搬入</button>
         <button class="tab" data-view="three" type="button">3D</button>
       </nav>
 
@@ -173,6 +174,29 @@
           <p id="wallCeilingNote" class="wall-note" hidden>破線は表示上限です。天井位置を示すものではありません。</p>
         </section>
 
+        <section id="deliveryView" class="view delivery-view" aria-label="搬入経路">
+          <div class="delivery-heading">
+            <div><p class="eyebrow">DELIVERY ROUTE</p><h2>搬入経路</h2></div>
+            <span class="delivery-caution">参考判定</span>
+          </div>
+          <p class="delivery-intro">家具の設置寸法とは別に、梱包時または搬入時の3辺を登録して、計測済みの通路・開口寸法と比較します。</p>
+          <div id="deliveryEmpty" class="wall-empty">
+            <strong>搬入経路データがありません</strong>
+            <span>対応するJSONを読み込むと表示されます。</span>
+          </div>
+          <div id="deliveryContent" hidden>
+            <div id="deliveryRouteGrid" class="delivery-route-grid"></div>
+            <section class="delivery-furniture-section" aria-labelledby="deliveryFurnitureTitle">
+              <div class="delivery-section-heading">
+                <h3 id="deliveryFurnitureTitle">家具ごとの確認</h3>
+                <span>搬入時の3辺を使用</span>
+              </div>
+              <div id="deliveryFurnitureList" class="delivery-furniture-list"></div>
+            </section>
+            <div id="deliveryLimitations" class="delivery-limitations"></div>
+          </div>
+        </section>
+
         <section id="threeView" class="view placeholder-view" aria-label="3D表示">
           <p class="eyebrow">PHASE 3</p>
           <h2>3D</h2>
@@ -247,6 +271,29 @@
           <label class="field-label">設置する部屋<select id="furnitureRoom" name="room"></select></label>
           <p class="form-help">選んだ部屋を基準に、部屋外判定と壁までの距離を計算します。追加後は「🔓 編集」で移動できます。</p>
           <button id="furnitureSubmitButton" class="primary-button full-width" type="submit">追加する</button>
+        </form>
+      </dialog>
+
+      <dialog id="deliveryDialog" class="detail-dialog form-dialog">
+        <form id="deliveryForm">
+          <div class="sheet-heading">
+            <div><p class="eyebrow">DELIVERY SIZE</p><h2 id="deliveryDialogTitle">搬入時の寸法</h2></div>
+            <button id="cancelDeliveryButton" class="icon-button" type="button" aria-label="閉じる">×</button>
+          </div>
+          <p class="form-help">梱包箱または搬入時の本体について、向きを決めずに3辺を入力してください。</p>
+          <label class="field-label">測定対象
+            <select id="deliveryBasis">
+              <option value="packed">梱包状態</option>
+              <option value="body">本体（梱包なし）</option>
+            </select>
+          </label>
+          <div class="field-row delivery-dimension-row">
+            <label class="field-label">辺A（cm）<input id="deliverySideA" type="number" min="1" max="1000" step="0.1" inputmode="decimal" required /></label>
+            <label class="field-label">辺B（cm）<input id="deliverySideB" type="number" min="1" max="1000" step="0.1" inputmode="decimal" required /></label>
+            <label class="field-label">辺C（cm）<input id="deliverySideC" type="number" min="1" max="1000" step="0.1" inputmode="decimal" required /></label>
+          </div>
+          <p class="form-help">傾ける余地、持ち手、養生、曲がり角は自動判定できません。結果は搬入可否の保証ではありません。</p>
+          <button class="primary-button full-width" type="submit">寸法を保存</button>
         </form>
       </dialog>
 

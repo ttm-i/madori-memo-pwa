@@ -523,6 +523,11 @@ export function detailMarkup(type, item) {
     }
     if (item.kind && item.kind !== "kitchen") values.push(["種類", item.kind]);
     if (type === "furniture" && item.roomName) values.push(["配置先", item.roomName]);
+    if (type === "furniture" && item.deliveryDimensions) {
+      const dimensions = item.deliveryDimensions;
+      values.push(["搬入時の3辺", `${dimensions.sideACm} × ${dimensions.sideBCm} × ${dimensions.sideCCm} cm`]);
+      values.push(["搬入寸法の対象", dimensions.basis === "body" ? "本体（梱包なし）" : "梱包状態"]);
+    }
     if (type === "furniture" && item.placement?.inside) {
       const labels = { left: "左の壁まで", right: "右の壁まで", top: "上の壁まで", bottom: "下の壁まで" };
       for (const [key, label] of Object.entries(labels)) {

@@ -1,5 +1,5 @@
 import { deleteActivePlan, loadActivePlan, saveActivePlan } from "./db.js";
-import { analyzeFurnitureConflicts, analyzeFurniturePlacement, buildElevationItems, buildRoomWalls, buildWallDiagram, countQualities, createSamplePlan, DIMENSION_GROUP_LABELS, duplicateFurniture, getDimensionGroup, getElectricalPlanPosition, rotateFurniture, updateFurniture, validatePlan, wallDisplayWidth } from "./model.js";
+import { analyzeDeliveryRoute, analyzeFurnitureConflicts, analyzeFurniturePlacement, buildElevationItems, buildRoomWalls, buildWallDiagram, countQualities, createSamplePlan, DIMENSION_GROUP_LABELS, duplicateFurniture, getDimensionGroup, getElectricalPlanPosition, rotateFurniture, updateFurniture, validatePlan, wallDisplayWidth } from "./model.js";
 import { detailMarkup, PlanRenderer } from "./renderer.js";
 
 const elements = Object.fromEntries([
@@ -21,6 +21,9 @@ const elements = Object.fromEntries([
   "wallDiagramPanel", "wallPlanTitle", "wallPlanSvg", "wallList", "wallDiagramTitle", "wallDiagramMeta", "wallDiagramSvg", "wallDiagramDetails",
   "wallScrollViewButton", "wallOverviewButton", "wallSvgScroll",
   "wallHeightPanel", "wallCanvas", "wallScale", "wallTrack", "wallLegend", "wallCeilingNote",
+  "deliveryEmpty", "deliveryContent", "deliveryRouteGrid", "deliveryFurnitureList", "deliveryLimitations",
+  "deliveryDialog", "deliveryForm", "deliveryDialogTitle", "cancelDeliveryButton", "deliveryBasis",
+  "deliverySideA", "deliverySideB", "deliverySideC",
 ].map((id) => [id, document.getElementById(id)]));
 
 let activePlan = null;
@@ -33,6 +36,7 @@ let selectedWallRoomId = null;
 let selectedWallId = null;
 let wallDisplayMode = "diagram";
 let wallViewportMode = "scroll";
+let deliveryFurnitureId = null;
 const selectableByMode = {
   view: new Set(["room", "dimension", "equipment", "electrical", "furniture"]),
   edit: new Set(["furniture"]),
@@ -95,6 +99,117 @@ function updateSummary() {
   elements.roomCount.textContent = activePlan.plan.rooms.length;
   elements.measuredCount.textContent = counts.measured;
   elements.uncertainCount.textContent = counts.uncertain;
+}
+
+function routeOpeningSize(route) {
+  const opening = activePlan?.plan.openings?.find((item) => item.id === route?.dwellingEntranceOpeningId);
+  return {
+    width: route?.dwellingEntrance?.openingWidthCm ?? opening?.clearOpeningWidthCm ?? opening?.widthCm,
+    height: route?.dwellingEntrance?.openingHeightCm ?? opening?.heightCm,
+  };
+}
+
+function openDeliveryDialog(furniture) {
+  deliveryFurnitureId = furniture.id;
+  const dimensions = furniture.deliveryDimensions ?? {};
+  elements.deliveryDialogTitle.textContent = `${furniture.name}の搬入寸法`;
+  elements.deliveryBasis.value = dimensions.basis === "body" ? "body" : "packed";
+  elements.deliverySideA.value = dimensions.sideACm ?? "";
+  elements.deliverySideB.value = dimensions.sideBCm ?? "";
+  elements.deliverySideC.value = dimensions.sideCCm ?? "";
+  elements.deliveryDialog.showModal();
+}
+
+function renderDeliveryView() {
+  const route = activePlan?.plan.accessRoute;
+  elements.deliveryEmpty.hidden = Boolean(route);
+  elements.deliveryContent.hidden = !route;
+  if (!route) {
+    elements.deliveryRouteGrid.replaceChildren();
+    elements.deliveryFurnitureList.replaceChildren();
+    elements.deliveryLimitations.replaceChildren();
+    return;
+  }
+  const entrance = routeOpeningSize(route);
+  const routeCards = [
+    { title: "共用廊下", value: Number.isFinite(route.commonCorridor?.widthCm) ? `幅 ${route.commonCorridor.widthCm} cm` : "未測定", note: "曲がり角・待避余地は別途確認" },
+    { title: "エレベーター入口", value: Number.isFinite(route.elevator?.openingWidthCm) && Number.isFinite(route.elevator?.openingHeightCm) ? `${route.elevator.openingWidthCm} × ${route.elevator.openingHeightCm} cm` : "未測定", note: "幅 × 開口高さ" },
+    { title: "エレベーター庫内", value: Number.isFinite(route.elevator?.cabinWidthCm) && Number.isFinite(route.elevator?.cabinDepthCm) ? `${route.elevator.cabinWidthCm} × ${route.elevator.cabinDepthCm} cm` : "未測定", note: "床面の幅 × 奥行・高さ未測定" },
+    { title: "住戸玄関", value: Number.isFinite(entrance.width) && Number.isFinite(entrance.height) ? `${entrance.width} × ${entrance.height} cm` : "未測定", note: "有効幅 × 開口高さ" },
+  ].map((item) => {
+    const card = document.createElement("article");
+    card.className = "delivery-route-card";
+    const title = document.createElement("strong");
+    title.textContent = item.title;
+    const value = document.createElement("b");
+    value.textContent = item.value;
+    const note = document.createElement("span");
+    note.textContent = item.note;
+    card.append(title, value, note);
+    return card;
+  });
+  elements.deliveryRouteGrid.replaceChildren(...routeCards);
+
+  const furniture = activePlan.plan.furniture ?? [];
+  if (!furniture.length) {
+    const empty = document.createElement("p");
+    empty.className = "furniture-list-empty";
+    empty.textContent = "2D画面で家具を追加すると、ここで搬入寸法を登録できます。";
+    elements.deliveryFurnitureList.replaceChildren(empty);
+  } else {
+    const cards = furniture.map((item) => {
+      const analysis = analyzeDeliveryRoute(item, activePlan);
+      const statusLabels = { candidate: "数値上は通過候補", review: "要再確認", missing: "寸法未登録" };
+      const card = document.createElement("article");
+      card.className = "delivery-furniture-card";
+      const header = document.createElement("div");
+      header.className = "delivery-furniture-card-header";
+      const name = document.createElement("strong");
+      name.textContent = item.name;
+      const status = document.createElement("span");
+      status.className = `delivery-status ${analysis.status}`;
+      status.textContent = statusLabels[analysis.status];
+      header.append(name, status);
+      const size = document.createElement("p");
+      size.className = "delivery-size";
+      const dimensions = item.deliveryDimensions;
+      size.textContent = dimensions
+        ? `${dimensions.basis === "body" ? "本体" : "梱包"} ${dimensions.sideACm} × ${dimensions.sideBCm} × ${dimensions.sideCCm} cm`
+        : `設置寸法 ${item.widthCm} × ${item.depthCm} cm（搬入寸法は別途登録）`;
+      const checks = document.createElement("ul");
+      checks.className = "delivery-checks";
+      for (const check of analysis.checks) {
+        const row = document.createElement("li");
+        row.className = check.status;
+        const label = document.createElement("strong");
+        label.textContent = check.label;
+        const detail = document.createElement("span");
+        detail.textContent = check.detail;
+        row.append(label, detail);
+        checks.append(row);
+      }
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "secondary-button delivery-edit-button";
+      button.textContent = dimensions ? "搬入寸法を変更" : "搬入寸法を設定";
+      button.addEventListener("click", () => openDeliveryDialog(item));
+      card.append(header, size);
+      if (analysis.checks.length) card.append(checks);
+      card.append(button);
+      return card;
+    });
+    elements.deliveryFurnitureList.replaceChildren(...cards);
+  }
+  const limitations = route.limitations ?? [];
+  const title = document.createElement("strong");
+  title.textContent = "判定できない要素";
+  const list = document.createElement("ul");
+  for (const text of limitations) {
+    const item = document.createElement("li");
+    item.textContent = text;
+    list.append(item);
+  }
+  elements.deliveryLimitations.replaceChildren(title, list);
 }
 
 const SVG_NS = "http://www.w3.org/2000/svg";
@@ -409,6 +524,7 @@ async function setActivePlan(plan, { persist = true } = {}) {
   renderer.render(plan);
   updateSummary();
   updateWallView();
+  renderDeliveryView();
   updateDimensionFilters();
   requestAnimationFrame(() => renderer.fit());
   if (persist) {
@@ -501,6 +617,7 @@ function renderFurnitureList() {
 
 async function commitFurnitureChange(message) {
   renderer.render(activePlan);
+  renderDeliveryView();
   await persistActivePlan();
   elements.detailDialog.close();
   selectedFurnitureId = null;
@@ -562,6 +679,7 @@ document.querySelectorAll(".tab").forEach((tab) => tab.addEventListener("click",
   document.querySelectorAll(".view").forEach((view) => view.classList.remove("is-active"));
   document.getElementById(`${tab.dataset.view}View`).classList.add("is-active");
   if (tab.dataset.view === "wall") updateWallView();
+  if (tab.dataset.view === "delivery") renderDeliveryView();
 }));
 
 elements.wallDiagramModeButton.addEventListener("click", () => setWallDisplayMode("diagram"));
@@ -637,6 +755,29 @@ elements.cancelFurnitureButton.addEventListener("click", () => {
   editingFurnitureId = null;
   elements.furnitureDialog.close();
 });
+elements.cancelDeliveryButton.addEventListener("click", () => {
+  deliveryFurnitureId = null;
+  elements.deliveryDialog.close();
+});
+elements.deliveryForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const furniture = activePlan?.plan.furniture.find((item) => item.id === deliveryFurnitureId);
+  if (!furniture) return showToast("対象の家具が見つかりません");
+  const sides = [Number(elements.deliverySideA.value), Number(elements.deliverySideB.value), Number(elements.deliverySideC.value)];
+  if (!sides.every((value) => Number.isFinite(value) && value > 0)) return showToast("搬入寸法を確認してください");
+  pushHistory();
+  furniture.deliveryDimensions = {
+    sideACm: sides[0],
+    sideBCm: sides[1],
+    sideCCm: sides[2],
+    basis: elements.deliveryBasis.value === "body" ? "body" : "packed",
+  };
+  await persistActivePlan();
+  renderDeliveryView();
+  deliveryFurnitureId = null;
+  elements.deliveryDialog.close();
+  showToast("搬入時の寸法を保存しました");
+});
 elements.furnitureForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   const room = activePlan.plan.rooms.find((item) => item.id === elements.furnitureRoom.value) ?? activePlan.plan.rooms[0];
@@ -650,6 +791,7 @@ elements.furnitureForm.addEventListener("submit", async (event) => {
     pushHistory();
     updateFurniture(furniture, { name, roomId: room.id, widthCm, depthCm });
     renderer.render(activePlan);
+    renderDeliveryView();
     await persistActivePlan();
     editingFurnitureId = null;
     elements.furnitureDialog.close();
@@ -670,6 +812,7 @@ elements.furnitureForm.addEventListener("submit", async (event) => {
     quality: "measured",
   });
   renderer.render(activePlan);
+  renderDeliveryView();
   await persistActivePlan();
   elements.furnitureDialog.close();
   showToast("家具を追加しました。編集モードで移動できます");
@@ -732,6 +875,7 @@ elements.undoButton.addEventListener("click", async () => {
   renderer.render(activePlan);
   updateSummary();
   updateWallView();
+  renderDeliveryView();
   updateUndoButton();
   await persistActivePlan();
   showToast("直前の変更を戻しました");
@@ -744,6 +888,7 @@ elements.resetButton.addEventListener("click", async () => {
   renderer.render(null);
   updateSummary();
   updateWallView();
+  renderDeliveryView();
   updateDimensionFilters();
   updateUndoButton();
   elements.dataMenu.close();

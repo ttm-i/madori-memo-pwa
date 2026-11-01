@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { analyzeFurnitureConflicts, analyzeFurniturePlacement, buildElevationItems, buildRoomWalls, buildWallDiagram, countQualities, createSamplePlan, duplicateFurniture, FORMAT, getDimensionGroup, getElectricalPlanPosition, moveDimensionGuide, pointInPolygon, rectanglesOverlap, rotateFurniture, snapToGrid, updateFurniture, validatePlan, wallDisplayWidth } from "../dist/model.js";
+import { analyzeDeliveryRoute, analyzeFurnitureConflicts, analyzeFurniturePlacement, buildElevationItems, buildRoomWalls, buildWallDiagram, countQualities, createSamplePlan, duplicateFurniture, fitsRectangle, FORMAT, getDimensionGroup, getElectricalPlanPosition, moveDimensionGuide, pointInPolygon, rectanglesOverlap, rotateFurniture, snapToGrid, updateFurniture, validatePlan, wallDisplayWidth } from "../dist/model.js";
 import { buildKitchenComponentRects, detailMarkup, zoomTransformAround } from "../dist/renderer.js";
 
 test("sample plan conforms to the public schema", () => {
@@ -107,6 +107,20 @@ test("kitchen components are positioned from the measured edge segments", () => 
   assert.match(markup, /キッチン全体/);
   assert.match(markup, /シンク/);
   assert.match(markup, /コンロ/);
+});
+
+test("delivery checks consider every orientation without promising access", () => {
+  assert.equal(fitsRectangle([80, 45, 190], 85, 200), true);
+  assert.equal(fitsRectangle([210, 220, 230], 85, 200), false);
+  const sample = createSamplePlan();
+  const sofa = sample.plan.furniture[0];
+  const candidate = analyzeDeliveryRoute(sofa, sample);
+  assert.equal(candidate.status, "candidate");
+  assert.equal(candidate.checks.length, 4);
+  assert(candidate.checks.every((check) => check.status === "pass"));
+  const oversized = { ...sofa, deliveryDimensions: { sideACm: 210, sideBCm: 220, sideCCm: 230, basis: "packed" } };
+  assert.equal(analyzeDeliveryRoute(oversized, sample).status, "review");
+  assert.equal(analyzeDeliveryRoute({ ...sofa, deliveryDimensions: undefined }, sample).status, "missing");
 });
 
 test("plan styles can independently hide each display layer", () => {
