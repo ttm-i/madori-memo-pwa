@@ -1,5 +1,5 @@
 import { deleteActivePlan, loadActivePlan, saveActivePlan } from "./db.js";
-import { analyzeFurnitureConflicts, analyzeFurniturePlacement, buildElevationItems, countQualities, createSamplePlan, DIMENSION_GROUP_LABELS, duplicateFurniture, getDimensionGroup, rotateFurniture, updateFurniture, validatePlan } from "./model.js";
+import { analyzeFurnitureConflicts, analyzeFurniturePlacement, buildElevationItems, buildRoomWalls, buildWallDiagram, countQualities, createSamplePlan, DIMENSION_GROUP_LABELS, duplicateFurniture, getDimensionGroup, rotateFurniture, updateFurniture, validatePlan } from "./model.js";
 import { detailMarkup, PlanRenderer } from "./renderer.js";
 
 const elements = Object.fromEntries([
@@ -15,7 +15,9 @@ const elements = Object.fromEntries([
   "furnitureRoomEditGroup", "furnitureRoomEdit",
   "editFurnitureButton", "furnitureDialogTitle", "furnitureSubmitButton",
   "furnitureListButton", "furnitureListDialog", "furnitureList", "furnitureListCount",
-  "wallRoomList", "wallEmpty", "wallCanvas", "wallScale", "wallTrack", "wallLegend", "wallCeilingNote",
+  "wallDiagramModeButton", "wallHeightModeButton", "wallRoomList", "wallEmpty",
+  "wallDiagramPanel", "wallList", "wallDiagramTitle", "wallDiagramMeta", "wallDiagramSvg", "wallDiagramDetails",
+  "wallHeightPanel", "wallCanvas", "wallScale", "wallTrack", "wallLegend", "wallCeilingNote",
 ].map((id) => [id, document.getElementById(id)]));
 
 let activePlan = null;
@@ -25,6 +27,8 @@ let editingFurnitureId = null;
 let locked = true;
 let dimensionGroups = new Set();
 let selectedWallRoomId = null;
+let selectedWallId = null;
+let wallDisplayMode = "diagram";
 const selectableByMode = {
   view: new Set(["room", "dimension", "equipment", "furniture"]),
   edit: new Set(["furniture"]),
@@ -89,38 +93,107 @@ function updateSummary() {
   elements.uncertainCount.textContent = counts.uncertain;
 }
 
-function updateWallView(preferredRoomId = selectedWallRoomId) {
-  const rooms = activePlan?.plan.rooms ?? [];
-  const availableRooms = rooms
-    .map((room) => ({ room, items: buildElevationItems(activePlan, room.id) }))
-    .filter(({ items }) => items.length);
-  selectedWallRoomId = availableRooms.some(({ room }) => room.id === preferredRoomId)
-    ? preferredRoomId
-    : availableRooms[0]?.room.id ?? null;
+const SVG_NS = "http://www.w3.org/2000/svg";
+function wallSvg(tag, attributes = {}, text = "") {
+  const element = document.createElementNS(SVG_NS, tag);
+  for (const [key, value] of Object.entries(attributes)) element.setAttribute(key, String(value));
+  if (text) element.textContent = text;
+  return element;
+}
 
-  const roomButtons = availableRooms.map(({ room }) => {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = `wall-room-button ${room.id === selectedWallRoomId ? "is-active" : ""}`;
-    button.textContent = room.name;
-    button.setAttribute("aria-pressed", String(room.id === selectedWallRoomId));
-    button.addEventListener("click", () => updateWallView(room.id));
-    return button;
+function renderWallDiagram(diagram) {
+  elements.wallDiagramSvg.replaceChildren();
+  elements.wallDiagramDetails.replaceChildren();
+  if (!diagram) {
+    elements.wallDiagramTitle.textContent = "壁を選択";
+    elements.wallDiagramMeta.textContent = "—";
+    return;
+  }
+  elements.wallDiagramTitle.textContent = diagram.label;
+  elements.wallDiagramMeta.textContent = `幅 ${Math.round(diagram.lengthCm * 10) / 10} cm`;
+  const highest = Math.max(200, ...diagram.items.map((item) => item.topCm));
+  const displayMaxCm = Math.max(225, Math.ceil((highest + 20) / 25) * 25);
+  const left = 70;
+  const right = 950;
+  const top = 72;
+  const floor = 500;
+  const drawWidth = right - left;
+  const drawHeight = floor - top;
+  const xFor = (value) => left + value / diagram.lengthCm * drawWidth;
+  const yFor = (value) => floor - value / displayMaxCm * drawHeight;
+
+  const grid = wallSvg("g", { class: "wall-svg-grid" });
+  for (let height = 0; height <= displayMaxCm; height += 50) {
+    const y = yFor(height);
+    grid.append(
+      wallSvg("line", { x1: left, y1: y, x2: right, y2: y }),
+      wallSvg("text", { x: left - 12, y: y + 5, "text-anchor": "end" }, `${height}`),
+    );
+  }
+  elements.wallDiagramSvg.append(grid);
+  elements.wallDiagramSvg.append(
+    wallSvg("line", { class: "wall-svg-limit", x1: left, y1: top, x2: right, y2: top }),
+    wallSvg("line", { class: "wall-svg-side", x1: left, y1: top, x2: left, y2: floor }),
+    wallSvg("line", { class: "wall-svg-side", x1: right, y1: top, x2: right, y2: floor }),
+    wallSvg("line", { class: "wall-svg-floor", x1: left, y1: floor, x2: right, y2: floor }),
+    wallSvg("text", { class: "wall-svg-limit-text", x: right, y: top - 13, "text-anchor": "end" }, `${displayMaxCm} cm（表示上限）`),
+    wallSvg("line", { class: "wall-svg-width-line", x1: left, y1: 36, x2: right, y2: 36 }),
+    wallSvg("text", { class: "wall-svg-width-text", x: (left + right) / 2, y: 28, "text-anchor": "middle" }, `壁幅 ${Math.round(diagram.lengthCm * 10) / 10} cm`),
+  );
+
+  const shapes = wallSvg("g", { class: "wall-svg-items" });
+  diagram.items.forEach((item, index) => {
+    const x = xFor(item.offsetCm);
+    const width = Math.max(4, item.widthCm / diagram.lengthCm * drawWidth);
+    const y = yFor(item.topCm);
+    const height = Math.max(3, yFor(item.bottomCm) - y);
+    if (item.marker) {
+      shapes.append(wallSvg("line", { class: `wall-svg-item wall-svg-${item.category} is-marker`, x1: x, y1: y, x2: x + width, y2: y }));
+    } else {
+      shapes.append(wallSvg("rect", { class: `wall-svg-item wall-svg-${item.category}`, x, y, width, height, rx: 4 }));
+    }
+    const badgeX = Math.min(right - 13, Math.max(left + 13, x + width / 2));
+    const badgeY = Math.max(top + 15, y + 18);
+    shapes.append(
+      wallSvg("circle", { class: "wall-svg-number-bg", cx: badgeX, cy: badgeY, r: 12 }),
+      wallSvg("text", { class: "wall-svg-number", x: badgeX, y: badgeY + 4, "text-anchor": "middle" }, index + 1),
+    );
   });
-  elements.wallRoomList.replaceChildren(...roomButtons);
+  elements.wallDiagramSvg.append(shapes);
 
-  const selected = availableRooms.find(({ room }) => room.id === selectedWallRoomId);
-  const items = selected?.items ?? [];
-  elements.wallEmpty.hidden = items.length > 0;
+  const detailRows = diagram.items.map((item, index) => {
+    const row = document.createElement("div");
+    row.className = "wall-diagram-detail";
+    const number = document.createElement("span");
+    number.className = `wall-detail-number wall-detail-${item.category}`;
+    number.textContent = String(index + 1);
+    const body = document.createElement("div");
+    const name = document.createElement("strong");
+    name.textContent = item.name;
+    const measurement = document.createElement("span");
+    const vertical = item.marker ? `床から ${item.topCm} cm` : `高さ ${item.bottomCm}–${item.topCm} cm`;
+    measurement.textContent = `図の左端から ${Math.round(item.offsetCm * 10) / 10} cm・幅 ${Math.round(item.widthCm * 10) / 10} cm・${vertical}`;
+    body.append(name, measurement);
+    row.append(number, body);
+    return row;
+  });
+  if (!detailRows.length) {
+    const empty = document.createElement("p");
+    empty.className = "wall-diagram-detail-empty";
+    empty.textContent = "この壁には、位置と高さが確定した開口部・設備がありません。";
+    detailRows.push(empty);
+  }
+  elements.wallDiagramDetails.replaceChildren(...detailRows);
+}
+
+function renderHeightComparison(items) {
   elements.wallCanvas.hidden = items.length === 0;
   elements.wallLegend.hidden = items.length === 0;
-  elements.wallCeilingNote.hidden = items.length === 0;
   if (!items.length) {
     elements.wallScale.replaceChildren();
     elements.wallTrack.replaceChildren();
     return;
   }
-
   const highest = Math.max(...items.map((item) => item.topCm));
   const displayMaxCm = Math.max(200, Math.ceil((highest + 20) / 25) * 25);
   const scaleMarks = [];
@@ -136,8 +209,6 @@ function updateWallView(preferredRoomId = selectedWallRoomId) {
   limit.textContent = `${displayMaxCm} cm（表示上限）`;
   scaleMarks.push(limit);
   elements.wallScale.replaceChildren(...scaleMarks);
-
-  elements.wallTrack.style.setProperty("--wall-display-max", displayMaxCm);
   elements.wallTrack.style.width = `${Math.max(100, items.length * 92)}px`;
   const lanes = items.map((item) => {
     const lane = document.createElement("div");
@@ -145,15 +216,8 @@ function updateWallView(preferredRoomId = selectedWallRoomId) {
     const shape = document.createElement("div");
     shape.className = `wall-item wall-item-${item.category} ${item.marker ? "is-marker" : ""}`;
     shape.style.bottom = `${item.bottomCm / displayMaxCm * 100}%`;
-    if (item.marker) {
-      shape.style.height = "3px";
-    } else {
-      shape.style.height = `${Math.max(1.5, (item.topCm - item.bottomCm) / displayMaxCm * 100)}%`;
-    }
-    const heightLabel = item.marker
-      ? `${item.topCm} cm`
-      : `${item.bottomCm}–${item.topCm} cm`;
-    shape.title = `${item.name} ${heightLabel}`;
+    shape.style.height = item.marker ? "3px" : `${Math.max(1.5, (item.topCm - item.bottomCm) / displayMaxCm * 100)}%`;
+    const heightLabel = item.marker ? `${item.topCm} cm` : `${item.bottomCm}–${item.topCm} cm`;
     const label = document.createElement("div");
     label.className = "wall-item-label";
     const name = document.createElement("strong");
@@ -170,6 +234,60 @@ function updateWallView(preferredRoomId = selectedWallRoomId) {
     return lane;
   });
   elements.wallTrack.replaceChildren(...lanes);
+}
+
+function updateWallView(preferredRoomId = selectedWallRoomId, preferredWallId = selectedWallId) {
+  const rooms = activePlan?.plan.rooms ?? [];
+  const roomChanged = preferredRoomId !== selectedWallRoomId;
+  selectedWallRoomId = rooms.some((room) => room.id === preferredRoomId) ? preferredRoomId : rooms[0]?.id ?? null;
+  if (roomChanged) preferredWallId = null;
+  const hasData = Boolean(activePlan && selectedWallRoomId);
+  elements.wallEmpty.hidden = hasData;
+  elements.wallDiagramPanel.hidden = !hasData || wallDisplayMode !== "diagram";
+  elements.wallHeightPanel.hidden = !hasData || wallDisplayMode !== "height";
+  elements.wallCeilingNote.hidden = !hasData;
+
+  const roomButtons = rooms.map((room) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = `wall-room-button ${room.id === selectedWallRoomId ? "is-active" : ""}`;
+    button.textContent = room.name;
+    button.setAttribute("aria-pressed", String(room.id === selectedWallRoomId));
+    button.addEventListener("click", () => updateWallView(room.id, null));
+    return button;
+  });
+  elements.wallRoomList.replaceChildren(...roomButtons);
+
+  if (!hasData) {
+    elements.wallRoomList.replaceChildren();
+    elements.wallList.replaceChildren();
+    renderWallDiagram(null);
+    renderHeightComparison([]);
+    return;
+  }
+
+  const walls = buildRoomWalls(activePlan, selectedWallRoomId);
+  const diagrams = walls.map((wall) => buildWallDiagram(activePlan, selectedWallRoomId, wall.id));
+  selectedWallId = walls.some((wall) => wall.id === preferredWallId)
+    ? preferredWallId
+    : diagrams.sort((first, second) => second.items.length - first.items.length)[0]?.id ?? walls[0]?.id ?? null;
+  const wallButtons = walls.map((wall) => {
+    const diagram = buildWallDiagram(activePlan, selectedWallRoomId, wall.id);
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = `wall-list-button ${wall.id === selectedWallId ? "is-active" : ""}`;
+    button.setAttribute("aria-pressed", String(wall.id === selectedWallId));
+    const name = document.createElement("strong");
+    name.textContent = wall.label;
+    const meta = document.createElement("span");
+    meta.textContent = `${Math.round(wall.lengthCm * 10) / 10} cm${diagram.items.length ? `・${diagram.items.length}要素` : ""}`;
+    button.append(name, meta);
+    button.addEventListener("click", () => updateWallView(selectedWallRoomId, wall.id));
+    return button;
+  });
+  elements.wallList.replaceChildren(...wallButtons);
+  renderWallDiagram(buildWallDiagram(activePlan, selectedWallRoomId, selectedWallId));
+  renderHeightComparison(buildElevationItems(activePlan, selectedWallRoomId));
 }
 
 function updateDimensionFilters() {
@@ -343,12 +461,25 @@ function syncSelectableControls() {
   renderer.setSelectableTypes(selected);
 }
 
+function setWallDisplayMode(mode) {
+  wallDisplayMode = mode;
+  const diagramActive = mode === "diagram";
+  elements.wallDiagramModeButton.classList.toggle("is-active", diagramActive);
+  elements.wallDiagramModeButton.setAttribute("aria-pressed", String(diagramActive));
+  elements.wallHeightModeButton.classList.toggle("is-active", !diagramActive);
+  elements.wallHeightModeButton.setAttribute("aria-pressed", String(!diagramActive));
+  updateWallView();
+}
+
 document.querySelectorAll(".tab").forEach((tab) => tab.addEventListener("click", () => {
   document.querySelectorAll(".tab").forEach((item) => item.classList.toggle("is-active", item === tab));
   document.querySelectorAll(".view").forEach((view) => view.classList.remove("is-active"));
   document.getElementById(`${tab.dataset.view}View`).classList.add("is-active");
   if (tab.dataset.view === "wall") updateWallView();
 }));
+
+elements.wallDiagramModeButton.addEventListener("click", () => setWallDisplayMode("diagram"));
+elements.wallHeightModeButton.addEventListener("click", () => setWallDisplayMode("height"));
 
 elements.menuButton.addEventListener("click", () => elements.dataMenu.showModal());
 elements.selectionMenuButton.addEventListener("click", (event) => {
@@ -550,7 +681,15 @@ updateConnection();
 updateDimensionFilters();
 syncSelectableControls();
 updateUndoButton();
-loadActivePlan().then((plan) => plan ? setActivePlan(validatePlan(plan), { persist: false }) : updateSummary()).catch(() => {
+loadActivePlan().then((plan) => {
+  if (!plan) return updateSummary();
+  const validated = validatePlan(plan);
+  const legacySample = validated.meta.private === false
+    && validated.meta.title === "架空サンプル住戸"
+    && buildRoomWalls(validated, "sample-room").length > 0
+    && buildElevationItems(validated, "sample-room").length === 0;
+  return setActivePlan(legacySample ? createSamplePlan() : validated, { persist: legacySample });
+}).catch(() => {
   updateSummary();
   showToast("端末内データを開けませんでした");
 });

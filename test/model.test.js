@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { analyzeFurnitureConflicts, analyzeFurniturePlacement, buildElevationItems, countQualities, createSamplePlan, duplicateFurniture, FORMAT, getDimensionGroup, moveDimensionGuide, pointInPolygon, rectanglesOverlap, rotateFurniture, snapToGrid, updateFurniture, validatePlan } from "../dist/model.js";
+import { analyzeFurnitureConflicts, analyzeFurniturePlacement, buildElevationItems, buildRoomWalls, buildWallDiagram, countQualities, createSamplePlan, duplicateFurniture, FORMAT, getDimensionGroup, moveDimensionGuide, pointInPolygon, rectanglesOverlap, rotateFurniture, snapToGrid, updateFurniture, validatePlan } from "../dist/model.js";
 import { zoomTransformAround } from "../dist/renderer.js";
 
 test("sample plan conforms to the public schema", () => {
@@ -33,6 +33,25 @@ test("wall elevation items preserve measured heights without inventing a ceiling
     { name: "洋室引き戸", bottomCm: 0, topCm: 200 },
   ]);
   assert.equal(items.some((item) => item.name.includes("天井")), false);
+});
+
+test("room walls retain plan direction and place openings at measured horizontal offsets", () => {
+  const sample = createSamplePlan();
+  const walls = buildRoomWalls(sample, "sample-room");
+  assert.deepEqual(walls.map(({ id, label, lengthCm }) => ({ id, label, lengthCm })), [
+    { id: "sample-room-wall-0", label: "上側の壁", lengthCm: 500 },
+    { id: "sample-room-wall-1", label: "右側の壁", lengthCm: 280 },
+    { id: "sample-room-wall-2", label: "下側の壁", lengthCm: 500 },
+    { id: "sample-room-wall-3", label: "左側の壁", lengthCm: 280 },
+  ]);
+  const top = buildWallDiagram(sample, "sample-room", "sample-room-wall-0");
+  const bottom = buildWallDiagram(sample, "sample-room", "sample-room-wall-2");
+  assert.deepEqual(top.items.map(({ name, offsetCm, widthCm, topCm }) => ({ name, offsetCm, widthCm, topCm })), [
+    { name: "洋室引き戸", offsetCm: 120, widthCm: 140, topCm: 200 },
+  ]);
+  assert.deepEqual(bottom.items.map(({ name, offsetCm, widthCm, topCm }) => ({ name, offsetCm, widthCm, topCm })), [
+    { name: "掃き出し窓", offsetCm: 40, widthCm: 170, topCm: 180 },
+  ]);
 });
 
 test("furniture rotates around its center", () => {

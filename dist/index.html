@@ -97,33 +97,53 @@
           </section>
         </section>
 
-        <section id="wallView" class="view wall-view" aria-label="壁面・高さ比較">
+        <section id="wallView" class="view wall-view" aria-label="壁面図">
           <div class="wall-heading">
             <div>
-              <p class="eyebrow">WALL · HEIGHT</p>
-              <h2>壁面・高さ比較</h2>
+              <p class="eyebrow">WALL ELEVATION</p>
+              <h2>壁面図</h2>
             </div>
             <span class="unmeasured-badge">天井高 未測定</span>
           </div>
-          <p class="wall-intro">部屋を選ぶと、ドア・窓・設備・電気プレートを床からの高さで比較できます。横方向の並びは実際の壁位置ではありません。</p>
+          <p class="wall-intro">部屋と壁を選ぶと、平面図と同じ横位置・幅でドアや窓を表示します。破線の上端は表示範囲であり、天井位置ではありません。</p>
+          <div class="wall-mode-switch" aria-label="壁面表示の種類">
+            <button id="wallDiagramModeButton" class="wall-mode-button is-active" type="button" aria-pressed="true">立面図</button>
+            <button id="wallHeightModeButton" class="wall-mode-button" type="button" aria-pressed="false">高さ一覧</button>
+          </div>
           <div id="wallRoomList" class="wall-room-list" aria-label="表示する部屋"></div>
           <div id="wallEmpty" class="wall-empty">
-            <strong>高さデータがありません</strong>
+            <strong>壁面データがありません</strong>
             <span>間取りJSONを読み込むと表示されます。</span>
           </div>
-          <div id="wallCanvas" class="wall-canvas" hidden>
-            <div class="wall-scale-label">床からの高さ</div>
-            <div id="wallScale" class="wall-scale" aria-hidden="true"></div>
-            <div class="wall-scroll">
-              <div id="wallTrack" class="wall-track"></div>
-            </div>
+          <div id="wallDiagramPanel" class="wall-diagram-panel" hidden>
+            <div id="wallList" class="wall-list" aria-label="表示する壁"></div>
+            <section class="wall-diagram-card" aria-labelledby="wallDiagramTitle">
+              <div class="wall-diagram-heading">
+                <div><p class="eyebrow">SELECTED WALL</p><h3 id="wallDiagramTitle">壁を選択</h3></div>
+                <span id="wallDiagramMeta">—</span>
+              </div>
+              <div class="wall-svg-scroll">
+                <svg id="wallDiagramSvg" class="wall-diagram-svg" viewBox="0 0 1000 620" role="img" aria-label="選択した壁の立面図"></svg>
+              </div>
+              <div id="wallDiagramDetails" class="wall-diagram-details"></div>
+            </section>
           </div>
-          <div id="wallLegend" class="wall-legend" hidden>
-            <span><i class="legend-door"></i>ドア</span>
-            <span><i class="legend-window"></i>窓</span>
-            <span><i class="legend-equipment"></i>設備</span>
-            <span><i class="legend-outlet"></i>コンセント</span>
-            <span><i class="legend-switch"></i>スイッチ</span>
+          <div id="wallHeightPanel" hidden>
+            <p class="wall-height-help">同じ部屋にある要素を、実際の横位置とは関係なく高さ順に比較します。</p>
+            <div id="wallCanvas" class="wall-canvas" hidden>
+              <div class="wall-scale-label">床からの高さ</div>
+              <div id="wallScale" class="wall-scale" aria-hidden="true"></div>
+              <div class="wall-scroll">
+                <div id="wallTrack" class="wall-track"></div>
+              </div>
+            </div>
+            <div id="wallLegend" class="wall-legend" hidden>
+              <span><i class="legend-door"></i>ドア</span>
+              <span><i class="legend-window"></i>窓</span>
+              <span><i class="legend-equipment"></i>設備</span>
+              <span><i class="legend-outlet"></i>コンセント</span>
+              <span><i class="legend-switch"></i>スイッチ</span>
+            </div>
           </div>
           <p id="wallCeilingNote" class="wall-note" hidden>破線は表示上限です。天井位置を示すものではありません。</p>
         </section>

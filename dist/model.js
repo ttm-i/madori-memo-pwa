@@ -124,6 +124,87 @@ export function buildElevationItems(documentData, roomId) {
   return items;
 }
 
+function pointDistanceFromSegmentLine(point, wall) {
+  const dx = wall.to.x - wall.from.x;
+  const dy = wall.to.y - wall.from.y;
+  const length = wall.lengthCm || 1;
+  return Math.abs((point.x - wall.from.x) * dy - (point.y - wall.from.y) * dx) / length;
+}
+
+function projectOnWall(point, wall) {
+  const dx = wall.to.x - wall.from.x;
+  const dy = wall.to.y - wall.from.y;
+  return ((point.x - wall.from.x) * dx + (point.y - wall.from.y) * dy) / (wall.lengthCm || 1);
+}
+
+export function buildRoomWalls(documentData, roomId) {
+  const room = documentData?.plan?.rooms?.find((item) => item.id === roomId);
+  if (!room?.points?.length) return [];
+  const xs = room.points.map((point) => point.x);
+  const ys = room.points.map((point) => point.y);
+  const bounds = { left: Math.min(...xs), right: Math.max(...xs), top: Math.min(...ys), bottom: Math.max(...ys) };
+  const same = (first, second) => Math.abs(first - second) < 0.01;
+  const walls = room.points.map((from, index) => {
+    const to = room.points[(index + 1) % room.points.length];
+    const horizontal = Math.abs(to.x - from.x) >= Math.abs(to.y - from.y);
+    const lengthCm = Math.hypot(to.x - from.x, to.y - from.y);
+    let baseLabel = horizontal ? "内側の横壁" : "内側の縦壁";
+    if (horizontal && same(from.y, bounds.top)) baseLabel = "上側の壁";
+    else if (horizontal && same(from.y, bounds.bottom)) baseLabel = "下側の壁";
+    else if (!horizontal && same(from.x, bounds.left)) baseLabel = "左側の壁";
+    else if (!horizontal && same(from.x, bounds.right)) baseLabel = "右側の壁";
+    return { id: `${roomId}-wall-${index}`, roomId, index, from, to, lengthCm, horizontal, baseLabel };
+  }).filter((wall) => wall.lengthCm >= 5);
+  const totals = walls.reduce((counts, wall) => counts.set(wall.baseLabel, (counts.get(wall.baseLabel) ?? 0) + 1), new Map());
+  const seen = new Map();
+  return walls.map((wall) => {
+    const sequence = (seen.get(wall.baseLabel) ?? 0) + 1;
+    seen.set(wall.baseLabel, sequence);
+    return { ...wall, label: totals.get(wall.baseLabel) > 1 ? `${wall.baseLabel} ${sequence}` : wall.baseLabel };
+  });
+}
+
+export function buildWallDiagram(documentData, roomId, wallId) {
+  const wall = buildRoomWalls(documentData, roomId).find((item) => item.id === wallId);
+  if (!wall) return null;
+  const items = [];
+  for (const opening of documentData.plan.openings ?? []) {
+    if (!belongsToRoom(opening, roomId) || !opening.from || !opening.to || !Number.isFinite(opening.heightCm)) continue;
+    if (pointDistanceFromSegmentLine(opening.from, wall) > 12 || pointDistanceFromSegmentLine(opening.to, wall) > 12) continue;
+    const first = projectOnWall(opening.from, wall);
+    const second = projectOnWall(opening.to, wall);
+    const offsetCm = Math.min(first, second);
+    const widthCm = Math.abs(second - first);
+    if (offsetCm < -12 || offsetCm + widthCm > wall.lengthCm + 12 || widthCm < 1) continue;
+    const isWindow = String(opening.kind ?? "").includes("window");
+    const bottomCm = isWindow ? opening.sillHeightCm ?? 0 : 0;
+    items.push({
+      id: opening.id,
+      name: opening.name,
+      category: isWindow ? "window" : "door",
+      offsetCm: Math.max(0, offsetCm),
+      widthCm: Math.min(widthCm, wall.lengthCm),
+      bottomCm,
+      topCm: bottomCm + opening.heightCm,
+      detail: `幅 ${opening.widthCm ?? Math.round(widthCm * 10) / 10} cm`,
+    });
+  }
+
+  const verticalItems = buildElevationItems(documentData, roomId);
+  for (const feature of documentData.plan.features ?? []) {
+    if (feature.elevationWallId !== wall.id) continue;
+    const related = verticalItems.filter((item) => item.id === feature.id || item.id.startsWith(`${feature.id}-`));
+    for (const item of related) {
+      items.push({
+        ...item,
+        offsetCm: feature.elevationOffsetCm ?? 0,
+        widthCm: feature.elevationWidthCm ?? feature.internalWidthCm ?? feature.overallWidthCm ?? feature.width ?? 20,
+      });
+    }
+  }
+  return { ...wall, items };
+}
+
 export function rotateFurniture(furniture) {
   const centerX = furniture.x + furniture.widthCm / 2;
   const centerY = furniture.y + furniture.depthCm / 2;
@@ -278,7 +359,7 @@ export function createSamplePlan() {
         { id: "sample-door", name: "洋室引き戸", kind: "door", roomIds: ["sample-ldk", "sample-room"], from: {x:180,y:530}, to: {x:320,y:530}, widthCm: 140, heightCm: 200, quality: "measured" },
       ],
       features: [
-        { id: "sample-closet", name: "収納（仮）", kind: "closet", roomId: "sample-ldk", x:420, y:80, width:140, height:70, derivedInteriorHeightCm: 220, shelfUndersideHeightCm: 165, quality: "approximate", uncertain: true },
+        { id: "sample-closet", name: "収納（仮）", kind: "closet", roomId: "sample-ldk", elevationWallId: "sample-ldk-wall-0", elevationOffsetCm: 360, elevationWidthCm: 140, x:420, y:80, width:140, height:70, derivedInteriorHeightCm: 220, shelfUndersideHeightCm: 165, quality: "approximate", uncertain: true },
       ],
       walls: [],
       furniture: [],
