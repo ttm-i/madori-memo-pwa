@@ -1,6 +1,6 @@
-import { deleteActivePlan, loadActivePlan, saveActivePlan } from "./db.js";
-import { analyzeDeliveryRoute, analyzeFurnitureConflicts, analyzeFurniturePlacement, buildElevationItems, buildRoomWalls, buildWallDiagram, countQualities, createSamplePlan, DIMENSION_GROUP_LABELS, duplicateFurniture, getDimensionGroup, getElectricalPlanPosition, rotateFurniture, updateFurniture, validatePlan, wallDisplayWidth } from "./model.js";
-import { detailMarkup, PlanRenderer } from "./renderer.js";
+import { deleteActivePlan, loadActivePlan, saveActivePlan } from "./db.js?v=33";
+import { analyzeDeliveryRoute, analyzeFurnitureConflicts, analyzeFurniturePlacement, buildElevationItems, buildRoomWalls, buildWallDiagram, countQualities, createSamplePlan, DIMENSION_GROUP_LABELS, duplicateFurniture, getDimensionGroup, getElectricalPlanPosition, rotateFurniture, updateFurniture, validatePlan, wallDisplayWidth } from "./model.js?v=33";
+import { detailMarkup, PlanRenderer } from "./renderer.js?v=33";
 
 const elements = Object.fromEntries([
   "menuButton", "dataMenu", "detailDialog", "detailType", "detailTitle", "detailBody", "fileInput",
@@ -941,7 +941,7 @@ if ("serviceWorker" in navigator) {
     reloadingForUpdate = true;
     window.location.reload();
   });
-  window.addEventListener("load", () => navigator.serviceWorker.register("./sw.js")
+  window.addEventListener("load", () => navigator.serviceWorker.register("./sw.js?v=33")
     .then((registration) => registration.update())
     .catch(() => showToast("オフライン準備に失敗しました")));
 }
