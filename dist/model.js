@@ -480,6 +480,7 @@ export function createSamplePlan() {
       title: "架空サンプル住戸",
       units: "cm",
       private: false,
+      sampleVersion: 3,
       updatedAt: new Date().toISOString(),
       note: "操作確認用の架空データです。実在の住戸ではありません。",
     },

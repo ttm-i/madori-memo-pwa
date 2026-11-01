@@ -1,6 +1,6 @@
-import { deleteActivePlan, loadActivePlan, saveActivePlan } from "./db.js?v=34";
-import { analyzeDeliveryRoute, analyzeFurnitureConflicts, analyzeFurniturePlacement, buildElevationItems, buildRoomWalls, buildWallDiagram, countQualities, createSamplePlan, DIMENSION_GROUP_LABELS, duplicateFurniture, getDimensionGroup, getElectricalPlanPosition, rotateFurniture, updateFurniture, validatePlan, wallDisplayWidth } from "./model.js?v=34";
-import { detailMarkup, PlanRenderer } from "./renderer.js?v=34";
+import { deleteActivePlan, loadActivePlan, saveActivePlan } from "./db.js?v=35";
+import { analyzeDeliveryRoute, analyzeFurnitureConflicts, analyzeFurniturePlacement, buildElevationItems, buildRoomWalls, buildWallDiagram, countQualities, createSamplePlan, DIMENSION_GROUP_LABELS, duplicateFurniture, getDimensionGroup, getElectricalPlanPosition, rotateFurniture, updateFurniture, validatePlan, wallDisplayWidth } from "./model.js?v=35";
+import { detailMarkup, PlanRenderer } from "./renderer.js?v=35";
 
 const elements = Object.fromEntries([
   "menuButton", "dataMenu", "detailDialog", "detailType", "detailTitle", "detailBody", "fileInput",
@@ -939,7 +939,8 @@ loadActivePlan().then((plan) => {
   if (!plan) return updateSummary();
   const validated = validatePlan(plan);
   const legacySample = validated.meta.title === "架空サンプル住戸"
-    && (!validated.plan.features.some((feature) => feature.kind === "kitchen")
+    && (validated.meta.sampleVersion !== 3
+      || !validated.plan.features.some((feature) => feature.kind === "kitchen")
       || !validated.plan.accessRoute
       || buildElevationItems(validated, "sample-room").length === 0);
   return setActivePlan(legacySample ? createSamplePlan() : validated, { persist: legacySample });
@@ -955,7 +956,7 @@ if ("serviceWorker" in navigator) {
     reloadingForUpdate = true;
     window.location.reload();
   });
-  window.addEventListener("load", () => navigator.serviceWorker.register("./sw.js?v=34")
+  window.addEventListener("load", () => navigator.serviceWorker.register("./sw.js?v=35")
     .then((registration) => registration.update())
     .catch(() => showToast("オフライン準備に失敗しました")));
 }
