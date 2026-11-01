@@ -781,8 +781,8 @@ loadActivePlan().then((plan) => {
   const validated = validatePlan(plan);
   const legacySample = validated.meta.private === false
     && validated.meta.title === "架空サンプル住戸"
-    && buildRoomWalls(validated, "sample-room").length > 0
-    && buildElevationItems(validated, "sample-room").length === 0;
+    && (!validated.plan.features.some((feature) => feature.kind === "kitchen")
+      || buildElevationItems(validated, "sample-room").length === 0);
   return setActivePlan(legacySample ? createSamplePlan() : validated, { persist: legacySample });
 }).catch(() => {
   updateSummary();

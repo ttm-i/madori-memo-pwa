@@ -421,6 +421,7 @@ export function createSamplePlan() {
       ],
       features: [
         { id: "sample-closet", name: "収納（仮）", kind: "closet", roomId: "sample-ldk", elevationWallId: "sample-ldk-wall-0", elevationOffsetCm: 360, elevationWidthCm: 140, x:420, y:80, width:140, height:70, derivedInteriorHeightCm: 220, shelfUndersideHeightCm: 165, quality: "approximate", placementQuality: "approximate", uncertain: true },
+        { id: "sample-kitchen", name: "サンプルキッチン", kind: "kitchen", roomId: "sample-ldk", x:70, y:450, width:200, height:55, overallWidthCm:200, overallDepthCm:55, worktopHeightCm:85, horizontalSegmentsCm:{stoveToLeftEdge:10,stoveWidth:50,sinkToStove:40,sinkWidth:80,rightEdgeToSink:20,total:200}, depthDetailsCm:{stoveDepth:45,stoveToWall:3,sinkDepth:44,sinkToWall:4}, quality:"measured", placementQuality:"confirmed" },
       ],
       walls: [],
       electrical: {

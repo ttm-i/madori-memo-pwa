@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { analyzeFurnitureConflicts, analyzeFurniturePlacement, buildElevationItems, buildRoomWalls, buildWallDiagram, countQualities, createSamplePlan, duplicateFurniture, FORMAT, getDimensionGroup, getElectricalPlanPosition, moveDimensionGuide, pointInPolygon, rectanglesOverlap, rotateFurniture, snapToGrid, updateFurniture, validatePlan, wallDisplayWidth } from "../dist/model.js";
-import { detailMarkup, zoomTransformAround } from "../dist/renderer.js";
+import { buildKitchenComponentRects, detailMarkup, zoomTransformAround } from "../dist/renderer.js";
 
 test("sample plan conforms to the public schema", () => {
   const sample = createSamplePlan();
@@ -21,7 +21,7 @@ test("quality counts include uncertain room geometry", () => {
   const sample = createSamplePlan();
   sample.plan.rooms[0].uncertain = true;
   const counts = countQualities(sample);
-  assert.equal(counts.measured, 5);
+  assert.equal(counts.measured, 6);
   assert.equal(counts.uncertain, 3);
 });
 
@@ -91,6 +91,22 @@ test("feature detail separates dimension quality from placement quality", () => 
   });
   assert.match(markup, /寸法: 実測/);
   assert.match(markup, /配置: 要確認/);
+});
+
+test("kitchen components are positioned from the measured edge segments", () => {
+  const kitchen = {
+    x: 10, y: 20, width: 200, kind: "kitchen",
+    horizontalSegmentsCm: { stoveToLeftEdge: 10, stoveWidth: 50, sinkToStove: 40, sinkWidth: 80, rightEdgeToSink: 20 },
+    depthDetailsCm: { stoveDepth: 45, stoveToWall: 3, sinkDepth: 44, sinkToWall: 4 },
+  };
+  assert.deepEqual(buildKitchenComponentRects(kitchen), [
+    { kind: "stove", label: "コンロ", x: 20, y: 23, width: 50, height: 45 },
+    { kind: "sink", label: "シンク", x: 110, y: 24, width: 80, height: 44 },
+  ]);
+  const markup = detailMarkup("feature", { ...kitchen, overallWidthCm: 200, overallDepthCm: 60, worktopHeightCm: 85, quality: "measured", placementQuality: "confirmed" });
+  assert.match(markup, /キッチン全体/);
+  assert.match(markup, /シンク/);
+  assert.match(markup, /コンロ/);
 });
 
 test("plan styles can independently hide each display layer", () => {

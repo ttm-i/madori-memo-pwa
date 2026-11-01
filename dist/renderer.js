@@ -24,6 +24,33 @@ export function zoomTransformAround(transform, previousAnchor, nextAnchor, facto
   };
 }
 
+export function buildKitchenComponentRects(feature) {
+  const segments = feature?.horizontalSegmentsCm;
+  const depths = feature?.depthDetailsCm;
+  const required = [feature?.x, feature?.y, feature?.width, segments?.stoveToLeftEdge, segments?.stoveWidth,
+    segments?.sinkWidth, segments?.rightEdgeToSink, depths?.stoveDepth, depths?.stoveToWall,
+    depths?.sinkDepth, depths?.sinkToWall];
+  if (!required.every(Number.isFinite)) return [];
+  return [
+    {
+      kind: "stove",
+      label: "コンロ",
+      x: feature.x + segments.stoveToLeftEdge,
+      y: feature.y + depths.stoveToWall,
+      width: segments.stoveWidth,
+      height: depths.stoveDepth,
+    },
+    {
+      kind: "sink",
+      label: "シンク",
+      x: feature.x + feature.width - segments.rightEdgeToSink - segments.sinkWidth,
+      y: feature.y + depths.sinkToWall,
+      width: segments.sinkWidth,
+      height: depths.sinkDepth,
+    },
+  ];
+}
+
 export class PlanRenderer {
   constructor(svgElement, layer, onSelect, onFurnitureEvent, onViewChange) {
     this.svg = svgElement;
@@ -100,6 +127,30 @@ export class PlanRenderer {
       const rect = svg("rect", { class: `feature-shape ${placementUncertain ? "placement-uncertain" : ""}`, x: feature.x, y: feature.y, width: feature.width, height: feature.height, rx: 4, tabindex: 0, role: "button", "aria-label": feature.name });
       rect.addEventListener("click", () => { if (this.isSelectable("equipment")) this.onSelect("feature", feature); });
       group.append(rect);
+      if (feature.kind === "kitchen") {
+        for (const component of buildKitchenComponentRects(feature)) {
+          group.append(svg("rect", {
+            class: `kitchen-component kitchen-${component.kind}`,
+            x: component.x, y: component.y, width: component.width, height: component.height, rx: 5,
+          }));
+          if (component.kind === "stove") {
+            const burnerRadius = Math.max(3, Math.min(component.width, component.height) * 0.12);
+            for (const xRatio of [0.3, 0.7]) for (const yRatio of [0.3, 0.7]) {
+              group.append(svg("circle", {
+                class: "kitchen-burner",
+                cx: component.x + component.width * xRatio,
+                cy: component.y + component.height * yRatio,
+                r: burnerRadius,
+              }));
+            }
+          }
+          group.append(svg("text", {
+            class: `kitchen-component-label kitchen-${component.kind}-label`,
+            x: component.x + component.width / 2,
+            y: component.y + component.height / 2,
+          }, component.label));
+        }
+      }
       if (feature.shortLabel) {
         group.append(svg("text", {
           class: "feature-label",
@@ -456,11 +507,21 @@ export function detailMarkup(type, item) {
     if (Number.isFinite(item.horizontalPosition?.offsetCm)) values.push(["基準から", `${item.horizontalPosition.offsetCm} cm`]);
     values.push(["測定点", "プレート中心"]);
   } else {
-    if (Number.isFinite(item.widthCm)) values.push(["幅", `${item.widthCm} cm`]);
-    if (Number.isFinite(item.depthCm)) values.push(["奥行", `${item.depthCm} cm`]);
-    if (!Number.isFinite(item.widthCm) && Number.isFinite(item.width)) values.push(["表示幅", `${item.width} cm`]);
-    if (!Number.isFinite(item.depthCm) && Number.isFinite(item.height)) values.push(["表示奥行", `${item.height} cm`]);
-    if (item.kind) values.push(["種類", item.kind]);
+    if (item.kind === "kitchen") {
+      if (Number.isFinite(item.overallWidthCm) && Number.isFinite(item.overallDepthCm)) values.push(["キッチン全体", `${item.overallWidthCm} × ${item.overallDepthCm} cm`]);
+      if (Number.isFinite(item.worktopHeightCm)) values.push(["天板高さ", `床から ${item.worktopHeightCm} cm`]);
+      if (Number.isFinite(item.horizontalSegmentsCm?.sinkWidth) && Number.isFinite(item.depthDetailsCm?.sinkDepth)) values.push(["シンク", `${item.horizontalSegmentsCm.sinkWidth} × ${item.depthDetailsCm.sinkDepth} cm`]);
+      if (Number.isFinite(item.horizontalSegmentsCm?.stoveWidth) && Number.isFinite(item.depthDetailsCm?.stoveDepth)) values.push(["コンロ", `${item.horizontalSegmentsCm.stoveWidth} × ${item.depthDetailsCm.stoveDepth} cm`]);
+      if (Number.isFinite(item.horizontalSegmentsCm?.sinkToStove)) values.push(["シンク～コンロ", `${item.horizontalSegmentsCm.sinkToStove} cm`]);
+      if (Number.isFinite(item.horizontalSegmentsCm?.stoveToLeftEdge)) values.push(["左端～コンロ", `${item.horizontalSegmentsCm.stoveToLeftEdge} cm`]);
+      if (Number.isFinite(item.horizontalSegmentsCm?.rightEdgeToSink)) values.push(["シンク～右端", `${item.horizontalSegmentsCm.rightEdgeToSink} cm`]);
+    } else {
+      if (Number.isFinite(item.widthCm)) values.push(["幅", `${item.widthCm} cm`]);
+      if (Number.isFinite(item.depthCm)) values.push(["奥行", `${item.depthCm} cm`]);
+      if (!Number.isFinite(item.widthCm) && Number.isFinite(item.width)) values.push(["表示幅", `${item.width} cm`]);
+      if (!Number.isFinite(item.depthCm) && Number.isFinite(item.height)) values.push(["表示奥行", `${item.height} cm`]);
+    }
+    if (item.kind && item.kind !== "kitchen") values.push(["種類", item.kind]);
     if (type === "furniture" && item.roomName) values.push(["配置先", item.roomName]);
     if (type === "furniture" && item.placement?.inside) {
       const labels = { left: "左の壁まで", right: "右の壁まで", top: "上の壁まで", bottom: "下の壁まで" };

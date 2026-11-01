@@ -239,6 +239,12 @@ dialog::backdrop { background: rgba(32,36,31,.42); backdrop-filter: blur(2px); }
 .feature-shape { fill: #b8c9c1; stroke: #356859; stroke-width: 3; vector-effect: non-scaling-stroke; cursor: pointer; }
 .feature-shape.placement-uncertain { fill: url(#uncertainPattern); stroke: var(--warning); stroke-dasharray: 7 5; }
 .feature-label { fill: #4a3627; font-size: 9px; font-weight: 750; text-anchor: middle; dominant-baseline: middle; pointer-events: none; paint-order: stroke; stroke: var(--surface); stroke-width: 3px; }
+.kitchen-component { vector-effect: non-scaling-stroke; pointer-events: none; }
+.kitchen-stove { fill: #4d5250; stroke: #232725; stroke-width: 1.5; }
+.kitchen-sink { fill: #dce7e5; stroke: #52746d; stroke-width: 1.5; }
+.kitchen-burner { fill: none; stroke: #d9dedb; stroke-width: 1.5; vector-effect: non-scaling-stroke; pointer-events: none; }
+.kitchen-component-label { fill: #26322e; font-size: 8px; font-weight: 800; text-anchor: middle; dominant-baseline: middle; pointer-events: none; paint-order: stroke; stroke: rgba(255,255,255,.8); stroke-width: 2px; }
+.kitchen-stove-label { fill: white; stroke: rgba(35,39,37,.8); }
 .electrical-marker { cursor: pointer; }
 .electrical-hit { fill: transparent; }
 .electrical-leader { stroke: #8b6d59; stroke-width: 1.5; vector-effect: non-scaling-stroke; pointer-events: none; }
