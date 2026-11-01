@@ -130,7 +130,11 @@
                 <div><p class="eyebrow">SELECTED WALL</p><h3 id="wallDiagramTitle">壁を選択</h3></div>
                 <span id="wallDiagramMeta">—</span>
               </div>
-              <div class="wall-svg-scroll">
+              <div class="wall-viewport-switch" aria-label="立面図の表示方法">
+                <button id="wallScrollViewButton" class="wall-viewport-button is-active" type="button" aria-pressed="true">横スクロール</button>
+                <button id="wallOverviewButton" class="wall-viewport-button" type="button" aria-pressed="false">全体表示</button>
+              </div>
+              <div id="wallSvgScroll" class="wall-svg-scroll">
                 <svg id="wallDiagramSvg" class="wall-diagram-svg" viewBox="0 0 1000 620" role="img" aria-label="選択した壁の立面図"></svg>
               </div>
               <div id="wallDiagramDetails" class="wall-diagram-details"></div>

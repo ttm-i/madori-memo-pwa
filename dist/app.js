@@ -17,6 +17,7 @@ const elements = Object.fromEntries([
   "furnitureListButton", "furnitureListDialog", "furnitureList", "furnitureListCount",
   "wallDiagramModeButton", "wallHeightModeButton", "wallRoomList", "wallEmpty",
   "wallDiagramPanel", "wallPlanTitle", "wallPlanSvg", "wallList", "wallDiagramTitle", "wallDiagramMeta", "wallDiagramSvg", "wallDiagramDetails",
+  "wallScrollViewButton", "wallOverviewButton", "wallSvgScroll",
   "wallHeightPanel", "wallCanvas", "wallScale", "wallTrack", "wallLegend", "wallCeilingNote",
 ].map((id) => [id, document.getElementById(id)]));
 
@@ -29,6 +30,7 @@ let dimensionGroups = new Set();
 let selectedWallRoomId = null;
 let selectedWallId = null;
 let wallDisplayMode = "diagram";
+let wallViewportMode = "scroll";
 const selectableByMode = {
   view: new Set(["room", "dimension", "equipment", "furniture"]),
   edit: new Set(["furniture"]),
@@ -530,6 +532,17 @@ function setWallDisplayMode(mode) {
   updateWallView();
 }
 
+function setWallViewportMode(mode) {
+  wallViewportMode = mode === "overview" ? "overview" : "scroll";
+  const overviewActive = wallViewportMode === "overview";
+  elements.wallSvgScroll.classList.toggle("is-overview", overviewActive);
+  elements.wallScrollViewButton.classList.toggle("is-active", !overviewActive);
+  elements.wallScrollViewButton.setAttribute("aria-pressed", String(!overviewActive));
+  elements.wallOverviewButton.classList.toggle("is-active", overviewActive);
+  elements.wallOverviewButton.setAttribute("aria-pressed", String(overviewActive));
+  if (overviewActive) elements.wallSvgScroll.scrollLeft = 0;
+}
+
 document.querySelectorAll(".tab").forEach((tab) => tab.addEventListener("click", () => {
   document.querySelectorAll(".tab").forEach((item) => item.classList.toggle("is-active", item === tab));
   document.querySelectorAll(".view").forEach((view) => view.classList.remove("is-active"));
@@ -539,6 +552,8 @@ document.querySelectorAll(".tab").forEach((tab) => tab.addEventListener("click",
 
 elements.wallDiagramModeButton.addEventListener("click", () => setWallDisplayMode("diagram"));
 elements.wallHeightModeButton.addEventListener("click", () => setWallDisplayMode("height"));
+elements.wallScrollViewButton.addEventListener("click", () => setWallViewportMode("scroll"));
+elements.wallOverviewButton.addEventListener("click", () => setWallViewportMode("overview"));
 
 elements.menuButton.addEventListener("click", () => elements.dataMenu.showModal());
 elements.selectionMenuButton.addEventListener("click", (event) => {
