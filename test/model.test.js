@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { analyzeDeliveryRoute, analyzeFurnitureConflicts, analyzeFurniturePlacement, buildElevationItems, buildRoomWalls, buildWallDiagram, countQualities, createSamplePlan, duplicateFurniture, findDeliveryDoorPath, fitsRectangle, FORMAT, getDimensionGroup, getElectricalPlanPosition, moveDimensionGuide, pointInPolygon, rectanglesOverlap, rotateFurniture, snapToGrid, updateFurniture, validatePlan, wallDisplayWidth } from "../dist/model.js";
-import { buildKitchenComponentRects, detailMarkup, zoomTransformAround } from "../dist/renderer.js";
+import { buildKitchenComponentRects, detailMarkup, measurementMetrics, snapMeasurementPoint, zoomTransformAround } from "../dist/renderer.js";
 
 test("sample plan conforms to the public schema", () => {
   const sample = createSamplePlan();
@@ -180,6 +180,13 @@ test("dimension guides move only perpendicular to their measured edge", () => {
   moveDimensionGuide(vertical, -8);
   assert.deepEqual(horizontal, { from: { x: 10, y: 32.5 }, to: { x: 110, y: 32.5 } });
   assert.deepEqual(vertical, { from: { x: 22, y: 40 }, to: { x: 22, y: 140 } });
+});
+
+test("temporary measurement reports direct and axis distances and snaps to plan edges", () => {
+  assert.deepEqual(measurementMetrics({ x: 10, y: 20 }, { x: 40, y: 60 }), { distance: 50, horizontal: 30, vertical: 40 });
+  const sample = createSamplePlan();
+  assert.deepEqual(snapMeasurementPoint({ x: 100, y: 64 }, sample, 10), { x: 100, y: 60 });
+  assert.deepEqual(snapMeasurementPoint({ x: 400, y: 400 }, sample, 5), { x: 400, y: 400 });
 });
 
 test("furniture placement reports wall clearances inside a room", () => {

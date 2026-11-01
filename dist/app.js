@@ -1,6 +1,6 @@
-import { deleteActivePlan, loadActivePlan, saveActivePlan } from "./db.js?v=35";
-import { analyzeDeliveryRoute, analyzeFurnitureConflicts, analyzeFurniturePlacement, buildElevationItems, buildRoomWalls, buildWallDiagram, countQualities, createSamplePlan, DIMENSION_GROUP_LABELS, duplicateFurniture, getDimensionGroup, getElectricalPlanPosition, rotateFurniture, updateFurniture, validatePlan, wallDisplayWidth } from "./model.js?v=35";
-import { detailMarkup, PlanRenderer } from "./renderer.js?v=35";
+import { deleteActivePlan, loadActivePlan, saveActivePlan } from "./db.js?v=36";
+import { analyzeDeliveryRoute, analyzeFurnitureConflicts, analyzeFurniturePlacement, buildElevationItems, buildRoomWalls, buildWallDiagram, countQualities, createSamplePlan, DIMENSION_GROUP_LABELS, duplicateFurniture, getDimensionGroup, getElectricalPlanPosition, rotateFurniture, updateFurniture, validatePlan, wallDisplayWidth } from "./model.js?v=36";
+import { detailMarkup, measurementMetrics, PlanRenderer } from "./renderer.js?v=36";
 
 const elements = Object.fromEntries([
   "menuButton", "dataMenu", "detailDialog", "detailType", "detailTitle", "detailBody", "fileInput",
@@ -9,6 +9,7 @@ const elements = Object.fromEntries([
   "displayMenuButton", "displayMenu", "displayRoomLabelsToggle", "displayFeaturesToggle",
   "displayFurnitureToggle", "displayElectricalToggle", "displayDimensionsToggle",
   "dimensionFilters", "dimensionFilterList", "selectionMenuButton", "selectionMenu", "selectionModeHint",
+  "measureButton", "measurementPanel", "measurementStatus", "measurementClearButton", "measurementEndButton",
   "furnitureMenuButton", "furnitureMenu", "snapToggle",
   "summaryTitle", "roomCount", "measuredCount", "uncertainCount", "connectionBadge", "saveStatus", "toast",
   "furnitureButton", "furnitureDialog", "furnitureForm", "cancelFurnitureButton",
@@ -42,7 +43,7 @@ const selectableByMode = {
   edit: new Set(["furniture"]),
 };
 const history = [];
-const renderer = new PlanRenderer(elements.planCanvas, elements.viewportLayer, showDetail, handleFurnitureEvent, handleViewChange);
+const renderer = new PlanRenderer(elements.planCanvas, elements.viewportLayer, showDetail, handleFurnitureEvent, handleViewChange, handleMeasurementChange);
 
 function updateUndoButton() {
   elements.undoButton.hidden = history.length === 0;
@@ -50,6 +51,24 @@ function updateUndoButton() {
 
 function handleViewChange(changed) {
   elements.fitButton.hidden = !activePlan || !changed;
+}
+
+function handleMeasurementChange(measurement) {
+  if (!measurement.from) elements.measurementStatus.textContent = "始点をタップ";
+  else if (!measurement.to) elements.measurementStatus.textContent = "終点をタップ";
+  else {
+    const metrics = measurementMetrics(measurement.from, measurement.to);
+    elements.measurementStatus.textContent = `${Math.round(metrics.distance * 10) / 10} cm`;
+  }
+}
+
+function setMeasurementMode(value) {
+  if (value && !activePlan) return showToast("先に間取りデータを読み込んでください");
+  renderer.setMeasurementMode(value);
+  elements.measurementPanel.hidden = !value;
+  elements.measureButton.textContent = value ? "📏 測定を終了" : "📏 2点間を測る";
+  closeToolMenus();
+  if (value) showToast("始点と終点をタップしてください");
 }
 
 function pushHistory() {
@@ -689,6 +708,7 @@ function setWallViewportMode(mode) {
 }
 
 document.querySelectorAll(".tab").forEach((tab) => tab.addEventListener("click", () => {
+  if (tab.dataset.view !== "plan" && renderer.measurementMode) setMeasurementMode(false);
   document.querySelectorAll(".tab").forEach((item) => item.classList.toggle("is-active", item === tab));
   document.querySelectorAll(".view").forEach((view) => view.classList.remove("is-active"));
   document.getElementById(`${tab.dataset.view}View`).classList.add("is-active");
@@ -710,6 +730,9 @@ elements.selectionMenuButton.addEventListener("click", (event) => {
   event.stopPropagation();
   toggleToolMenu(elements.selectionMenuButton, elements.selectionMenu);
 });
+elements.measureButton.addEventListener("click", () => setMeasurementMode(!renderer.measurementMode));
+elements.measurementClearButton.addEventListener("click", () => renderer.clearMeasurement());
+elements.measurementEndButton.addEventListener("click", () => setMeasurementMode(false));
 elements.furnitureMenuButton.addEventListener("click", (event) => {
   event.stopPropagation();
   toggleToolMenu(elements.furnitureMenuButton, elements.furnitureMenu);
@@ -956,7 +979,7 @@ if ("serviceWorker" in navigator) {
     reloadingForUpdate = true;
     window.location.reload();
   });
-  window.addEventListener("load", () => navigator.serviceWorker.register("./sw.js?v=35")
+  window.addEventListener("load", () => navigator.serviceWorker.register("./sw.js")
     .then((registration) => registration.update())
     .catch(() => showToast("オフライン準備に失敗しました")));
 }

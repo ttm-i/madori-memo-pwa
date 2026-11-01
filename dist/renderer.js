@@ -1,4 +1,4 @@
-import { analyzeFurnitureConflicts, analyzeFurniturePlacement, getDimensionGroup, getElectricalPlanPosition, moveDimensionGuide, QUALITY_LABELS, snapToGrid } from "./model.js?v=35";
+import { analyzeFurnitureConflicts, analyzeFurniturePlacement, getDimensionGroup, getElectricalPlanPosition, moveDimensionGuide, QUALITY_LABELS, snapToGrid } from "./model.js?v=36";
 
 const NS = "http://www.w3.org/2000/svg";
 
@@ -11,6 +11,48 @@ function svg(name, attributes = {}, text = "") {
 
 function pointsValue(points) {
   return points.map((point) => `${point.x},${point.y}`).join(" ");
+}
+
+function projectPointToSegment(point, from, to) {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const lengthSquared = dx * dx + dy * dy;
+  if (!lengthSquared) return { ...from };
+  const ratio = Math.max(0, Math.min(1, ((point.x - from.x) * dx + (point.y - from.y) * dy) / lengthSquared));
+  return { x: from.x + dx * ratio, y: from.y + dy * ratio };
+}
+
+export function measurementMetrics(from, to) {
+  if (!from || !to) return null;
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  return { distance: Math.hypot(dx, dy), horizontal: Math.abs(dx), vertical: Math.abs(dy) };
+}
+
+export function snapMeasurementPoint(point, documentData, thresholdCm = 15) {
+  if (!documentData?.plan) return { ...point };
+  const segments = [];
+  const addPolygon = (points) => points?.forEach((from, index) => segments.push([from, points[(index + 1) % points.length]]));
+  const addRectangle = (item, width, height) => {
+    if (![item?.x, item?.y, width, height].every(Number.isFinite)) return;
+    addPolygon([{ x: item.x, y: item.y }, { x: item.x + width, y: item.y }, { x: item.x + width, y: item.y + height }, { x: item.x, y: item.y + height }]);
+  };
+  for (const room of documentData.plan.rooms ?? []) addPolygon(room.points);
+  for (const opening of documentData.plan.openings ?? []) if (opening.from && opening.to) segments.push([opening.from, opening.to]);
+  for (const wall of documentData.plan.walls ?? []) if (wall.from && wall.to) segments.push([wall.from, wall.to]);
+  for (const feature of documentData.plan.features ?? []) addRectangle(feature, feature.width, feature.height);
+  for (const furniture of documentData.plan.furniture ?? []) addRectangle(furniture, furniture.widthCm, furniture.depthCm);
+  let closest = { ...point };
+  let closestDistance = thresholdCm;
+  for (const [from, to] of segments) {
+    const candidate = projectPointToSegment(point, from, to);
+    const distance = Math.hypot(candidate.x - point.x, candidate.y - point.y);
+    if (distance <= closestDistance) {
+      closest = candidate;
+      closestDistance = distance;
+    }
+  }
+  return closest;
 }
 
 export function zoomTransformAround(transform, previousAnchor, nextAnchor, factor, minScale = 0.15, maxScale = 4) {
@@ -52,12 +94,13 @@ export function buildKitchenComponentRects(feature) {
 }
 
 export class PlanRenderer {
-  constructor(svgElement, layer, onSelect, onFurnitureEvent, onViewChange) {
+  constructor(svgElement, layer, onSelect, onFurnitureEvent, onViewChange, onMeasurementChange) {
     this.svg = svgElement;
     this.layer = layer;
     this.onSelect = onSelect;
     this.onFurnitureEvent = onFurnitureEvent;
     this.onViewChange = onViewChange;
+    this.onMeasurementChange = onMeasurementChange;
     this.transform = { x: 70, y: 50, scale: 0.78 };
     this.fitTransform = null;
     this.pointers = new Map();
@@ -65,6 +108,10 @@ export class PlanRenderer {
     this.snapEnabled = true;
     this.draggingFurniture = null;
     this.draggingDimension = null;
+    this.draggingMeasurement = null;
+    this.measurementPointer = null;
+    this.measurementMode = false;
+    this.measurement = { from: null, to: null };
     this.selectedFurnitureId = null;
     this.dimensionGroups = null;
     this.selectableTypes = new Set(["room", "dimension", "equipment", "electrical", "furniture"]);
@@ -309,8 +356,54 @@ export class PlanRenderer {
       });
       content.append(group);
     }
+    if (this.measurementMode) content.append(this.createMeasurementOverlay());
     this.layer.append(content);
     this.applyTransform();
+  }
+
+  createMeasurementOverlay() {
+    const group = svg("g", { class: "measurement-overlay" });
+    const { from, to } = this.measurement;
+    if (!from) return group;
+    const makeHandle = (key, point) => {
+      const handle = svg("g", { class: "measurement-handle", role: "button", tabindex: 0, "aria-label": key === "from" ? "測定の始点" : "測定の終点" });
+      handle.append(
+        svg("circle", { class: "measurement-handle-hit", cx: point.x, cy: point.y, r: 24 }),
+        svg("circle", { class: "measurement-handle-dot", cx: point.x, cy: point.y, r: 7 }),
+      );
+      handle.addEventListener("pointerdown", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        event.currentTarget.setPointerCapture?.(event.pointerId);
+        this.draggingMeasurement = { key, pointerId: event.pointerId };
+      });
+      return handle;
+    };
+    if (to) {
+      const metrics = measurementMetrics(from, to);
+      const corner = { x: to.x, y: from.y };
+      group.append(
+        svg("path", { class: "measurement-axis", d: `M ${from.x} ${from.y} L ${corner.x} ${corner.y} L ${to.x} ${to.y}` }),
+        svg("line", { class: "measurement-line", x1: from.x, y1: from.y, x2: to.x, y2: to.y }),
+      );
+      const midX = (from.x + to.x) / 2;
+      const midY = (from.y + to.y) / 2;
+      group.append(
+        svg("text", { class: "measurement-distance", x: midX, y: midY - 12 }, `${Math.round(metrics.distance * 10) / 10} cm`),
+        svg("text", { class: "measurement-breakdown", x: midX, y: midY + 8 }, `横 ${Math.round(metrics.horizontal * 10) / 10}・縦 ${Math.round(metrics.vertical * 10) / 10}`),
+      );
+    }
+    group.append(makeHandle("from", from));
+    if (to) group.append(makeHandle("to", to));
+    return group;
+  }
+
+  updateMeasurementOverlay() {
+    const content = this.layer.querySelector(".plan-content");
+    if (!content) return;
+    content.querySelector(".measurement-overlay")?.remove();
+    if (this.measurementMode) content.append(this.createMeasurementOverlay());
+    this.onMeasurementChange?.(structuredClone(this.measurement));
   }
 
   setLocked(value) {
@@ -322,6 +415,17 @@ export class PlanRenderer {
   setFeaturesVisible(value) { this.svg.classList.toggle("features-hidden", !value); }
   setFurnitureVisible(value) { this.svg.classList.toggle("furniture-hidden", !value); }
   setElectricalVisible(value) { this.svg.classList.toggle("electrical-hidden", !value); }
+  setMeasurementMode(value) {
+    this.measurementMode = value;
+    if (!value) this.measurement = { from: null, to: null };
+    this.svg.classList.toggle("measuring", value);
+    if (this.document) this.render(this.document);
+    this.onMeasurementChange?.(structuredClone(this.measurement));
+  }
+  clearMeasurement() {
+    this.measurement = { from: null, to: null };
+    this.updateMeasurementOverlay();
+  }
   setSnapEnabled(value) { this.snapEnabled = value; }
   setDimensionGroups(groups) {
     this.dimensionGroups = groups == null ? null : new Set(groups);
@@ -333,7 +437,7 @@ export class PlanRenderer {
     this.selectableTypes = new Set(types);
     if (this.document) this.render(this.document);
   }
-  isSelectable(type) { return this.selectableTypes.has(type); }
+  isSelectable(type) { return !this.measurementMode && this.selectableTypes.has(type); }
   setSelectedFurniture(id) {
     this.selectedFurnitureId = id;
     if (this.document) this.render(this.document);
@@ -362,12 +466,53 @@ export class PlanRenderer {
     this.onViewChange?.(changed);
   }
 
+  measurementPointFromEvent(event) {
+    const rect = this.svg.getBoundingClientRect();
+    const viewport = this.svg.viewBox.baseVal;
+    const viewportPoint = {
+      x: viewport.x + (event.clientX - rect.left) * viewport.width / rect.width,
+      y: viewport.y + (event.clientY - rect.top) * viewport.height / rect.height,
+    };
+    const point = {
+      x: (viewportPoint.x - this.transform.x) / this.transform.scale,
+      y: (viewportPoint.y - this.transform.y) / this.transform.scale,
+    };
+    const thresholdCm = 14 * viewport.width / rect.width / this.transform.scale;
+    return snapMeasurementPoint(point, this.document, thresholdCm);
+  }
+
   bindGestures() {
     this.svg.addEventListener("pointerdown", (event) => {
+      if (this.measurementMode) {
+        event.preventDefault();
+        event.target.setPointerCapture?.(event.pointerId);
+        const point = this.measurementPointFromEvent(event);
+        const startsNew = !this.measurement.from || this.measurement.to;
+        if (startsNew) this.measurement = { from: point, to: null };
+        this.measurementPointer = { pointerId: event.pointerId, clientX: event.clientX, clientY: event.clientY, action: startsNew ? "from" : "to", moved: false };
+        this.updateMeasurementOverlay();
+        return;
+      }
       event.target.setPointerCapture?.(event.pointerId);
       this.pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
     });
     this.svg.addEventListener("pointermove", (event) => {
+      if (this.draggingMeasurement?.pointerId === event.pointerId) {
+        event.preventDefault();
+        this.measurement[this.draggingMeasurement.key] = this.measurementPointFromEvent(event);
+        this.updateMeasurementOverlay();
+        return;
+      }
+      if (this.measurementPointer?.pointerId === event.pointerId) {
+        event.preventDefault();
+        const pointer = this.measurementPointer;
+        if (!pointer.moved && Math.hypot(event.clientX - pointer.clientX, event.clientY - pointer.clientY) >= 4) pointer.moved = true;
+        if (pointer.moved) {
+          this.measurement.to = this.measurementPointFromEvent(event);
+          this.updateMeasurementOverlay();
+        }
+        return;
+      }
       if (this.draggingFurniture) {
         const drag = this.draggingFurniture;
         if (!drag.moved && Math.hypot(event.clientX - drag.clientX, event.clientY - drag.clientY) < 4) return;
@@ -438,6 +583,18 @@ export class PlanRenderer {
       this.applyTransform();
     });
     const release = (event) => {
+      if (this.draggingMeasurement?.pointerId === event.pointerId) {
+        this.draggingMeasurement = null;
+        this.updateMeasurementOverlay();
+        return;
+      }
+      if (this.measurementPointer?.pointerId === event.pointerId) {
+        const pointer = this.measurementPointer;
+        if (pointer.action === "to" && !pointer.moved) this.measurement.to = this.measurementPointFromEvent(event);
+        this.measurementPointer = null;
+        this.updateMeasurementOverlay();
+        return;
+      }
       if (this.draggingFurniture) {
         const moved = this.draggingFurniture.moved;
         this.draggingFurniture = null;

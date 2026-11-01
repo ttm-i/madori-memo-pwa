@@ -10,7 +10,7 @@
     <meta name="description" content="間取りと家具寸法を端末内だけで確認するオフラインPWA" />
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" href="./icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="./styles.css?v=35" />
+    <link rel="stylesheet" href="./styles.css?v=36" />
     <title>間取りメモ</title>
   </head>
   <body>
@@ -59,8 +59,9 @@
               </div>
             </div>
             <div class="tool-menu">
-              <button id="selectionMenuButton" class="tool-button" type="button" aria-expanded="false" aria-controls="selectionMenu">選択対象⌄</button>
+              <button id="selectionMenuButton" class="tool-button" type="button" aria-expanded="false" aria-controls="selectionMenu">操作⌄</button>
               <div id="selectionMenu" class="tool-popover" hidden>
+                <button id="measureButton" class="popover-action measure-action" type="button">📏 2点間を測る</button>
                 <p class="popover-title">タッチできる要素</p>
                 <label><input type="checkbox" data-selectable="room" /> 部屋</label>
                 <label><input type="checkbox" data-selectable="dimension" /> 寸法線</label>
@@ -83,6 +84,11 @@
           <div id="canvasFrame" class="canvas-frame">
             <button id="undoButton" class="canvas-action undo-action" type="button" aria-label="元に戻す" title="元に戻す" hidden>↶</button>
             <button id="fitButton" class="canvas-action fit-action" type="button" hidden>全体</button>
+            <div id="measurementPanel" class="measurement-panel" hidden>
+              <span id="measurementStatus">始点をタップ</span>
+              <button id="measurementClearButton" type="button">クリア</button>
+              <button id="measurementEndButton" type="button">終了</button>
+            </div>
             <svg id="planCanvas" viewBox="0 0 800 1100" role="img" aria-labelledby="planTitle planDescription">
               <title id="planTitle">間取り平面図</title>
               <desc id="planDescription">読み込んだ間取りデータを表示します</desc>
@@ -303,7 +309,7 @@
       <input id="fileInput" type="file" accept="application/json,.json" hidden />
       <div id="toast" class="toast" role="status" aria-live="polite"></div>
     </div>
-    <script type="module" src="./app.js?v=35"></script>
+    <script type="module" src="./app.js?v=36"></script>
   </body>
 </html>
 

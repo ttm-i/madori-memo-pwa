@@ -1,12 +1,12 @@
-const CACHE_NAME = "floor-plan-shell-v35";
+const CACHE_NAME = "floor-plan-shell-v36";
 const APP_SHELL = [
   "./",
   "./index.html",
-  "./styles.css?v=35",
-  "./app.js?v=35",
-  "./db.js?v=35",
-  "./model.js?v=35",
-  "./renderer.js?v=35",
+  "./styles.css?v=36",
+  "./app.js?v=36",
+  "./db.js?v=36",
+  "./model.js?v=36",
+  "./renderer.js?v=36",
   "./manifest.webmanifest",
   "./icon.svg",
 ];
@@ -21,6 +21,14 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET" || new URL(event.request.url).origin !== self.location.origin) return;
+  if (event.request.mode === "navigate") {
+    event.respondWith(fetch(event.request).then((response) => {
+      const copy = response.clone();
+      caches.open(CACHE_NAME).then((cache) => cache.put("./index.html", copy));
+      return response;
+    }).catch(() => caches.match("./index.html")));
+    return;
+  }
   event.respondWith(caches.match(event.request).then((cached) => cached || fetch(event.request).then((response) => {
     const copy = response.clone();
     caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
