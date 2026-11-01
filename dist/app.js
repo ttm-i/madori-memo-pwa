@@ -378,6 +378,14 @@ loadActivePlan().then((plan) => plan ? setActivePlan(validatePlan(plan), { persi
 });
 
 if ("serviceWorker" in navigator) {
-  window.addEventListener("load", () => navigator.serviceWorker.register("./sw.js").catch(() => showToast("オフライン準備に失敗しました")));
+  let reloadingForUpdate = false;
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (reloadingForUpdate) return;
+    reloadingForUpdate = true;
+    window.location.reload();
+  });
+  window.addEventListener("load", () => navigator.serviceWorker.register("./sw.js")
+    .then((registration) => registration.update())
+    .catch(() => showToast("オフライン準備に失敗しました")));
 }
 
