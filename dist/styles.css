@@ -43,6 +43,14 @@ button { color: inherit; touch-action: manipulation; }
 .tool-popover { position: absolute; top: calc(100% + 7px); right: 0; z-index: 12; display: grid; width: max-content; min-width: 210px; max-width: min(290px, calc(100vw - 28px)); padding: 10px; border: 1px solid var(--line); border-radius: 15px; background: var(--surface); box-shadow: var(--shadow); touch-action: manipulation; }
 .tool-popover label { display: flex; align-items: center; gap: 9px; min-height: 42px; padding: 0 8px; color: var(--ink); font-size: .8rem; font-weight: 650; }
 .tool-popover input { width: 18px; height: 18px; accent-color: var(--accent); }
+.display-popover { right: auto; left: 0; width: min(300px, calc(100vw - 28px)); }
+.dimension-filter-popover { display: grid; gap: 7px; margin: 4px 0; padding: 9px 8px 10px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.dimension-filter-popover .filter-title { padding: 0; }
+.dimension-filter-popover .filter-chip { min-height: 30px; padding: 0 8px; }
+.placement-legend { display: grid; gap: 6px; padding: 9px 8px 3px; color: var(--muted); font-size: .67rem; }
+.placement-legend span { display: flex; align-items: center; gap: 7px; }
+.placement-legend i { width: 22px; height: 12px; border: 2px solid #356859; border-radius: 3px; background: #b8c9c1; }
+.placement-legend .placement-uncertain { border-color: var(--warning); border-style: dashed; background: #f2e5d5; }
 .popover-title { margin: 3px 8px 5px; color: var(--muted); font-size: .68rem; font-weight: 750; letter-spacing: .08em; }
 .popover-help { margin: 6px 8px 3px; color: var(--muted); font-size: .68rem; }
 .popover-action { min-height: 44px; padding: 0 10px; border: 0; border-bottom: 1px solid var(--line); background: transparent; color: var(--ink); text-align: left; font-weight: 700; }
@@ -216,6 +224,9 @@ dialog::backdrop { background: rgba(32,36,31,.42); backdrop-filter: blur(2px); }
 .furniture-list-item.danger { border-color: #d68b84; background: #fff3f1; }
 .quality-tag { display: inline-flex; margin-top: 14px; padding: 5px 9px; border-radius: 99px; background: var(--accent-soft); color: var(--accent); font-size: .72rem; font-weight: 750; }
 .quality-tag.approximate, .quality-tag.unmeasured { background: var(--warning-soft); color: #824c1c; }
+.quality-tags { display: flex; flex-wrap: wrap; gap: 7px; }
+.quality-tag.placement.confirmed { background: var(--accent-soft); color: var(--accent); }
+.quality-tag.placement.approximate { background: var(--warning-soft); color: #824c1c; }
 .toast { position: fixed; left: 50%; bottom: calc(22px + env(safe-area-inset-bottom)); z-index: 20; max-width: calc(100% - 32px); padding: 11px 16px; border-radius: 99px; background: #272c28; color: white; font-size: .78rem; opacity: 0; transform: translate(-50%, 12px); pointer-events: none; transition: .22s ease; }
 .toast.visible { opacity: 1; transform: translate(-50%, 0); }
 
@@ -226,15 +237,15 @@ dialog::backdrop { background: rgba(32,36,31,.42); backdrop-filter: blur(2px); }
 .room-area { fill: #6e746d; font-size: 15px; text-anchor: middle; pointer-events: none; }
 .opening-line { stroke: #4f786c; stroke-width: 8; stroke-linecap: round; vector-effect: non-scaling-stroke; cursor: pointer; }
 .feature-shape { fill: #b8c9c1; stroke: #356859; stroke-width: 3; vector-effect: non-scaling-stroke; cursor: pointer; }
-.feature-shape.uncertain { fill: url(#uncertainPattern); stroke: var(--warning); stroke-dasharray: 7 5; }
+.feature-shape.placement-uncertain { fill: url(#uncertainPattern); stroke: var(--warning); stroke-dasharray: 7 5; }
 .feature-label { fill: #4a3627; font-size: 9px; font-weight: 750; text-anchor: middle; dominant-baseline: middle; pointer-events: none; paint-order: stroke; stroke: var(--surface); stroke-width: 3px; }
 .electrical-marker { cursor: pointer; }
 .electrical-hit { fill: transparent; }
 .electrical-leader { stroke: #8b6d59; stroke-width: 1.5; vector-effect: non-scaling-stroke; pointer-events: none; }
 .electrical-symbol { fill: #fff8ee; stroke: #ba6b36; stroke-width: 2.5; vector-effect: non-scaling-stroke; }
 .electrical-switch .electrical-symbol { fill: #eef7f4; stroke: #3f7668; }
-.electrical-label { fill: #78451f; font-size: 10px; font-weight: 850; text-anchor: middle; pointer-events: none; paint-order: stroke; stroke: #fff; stroke-width: 2px; }
-.electrical-switch .electrical-label { fill: #315e53; }
+.electrical-glyph { stroke: #8d4c22; stroke-width: 2.5; stroke-linecap: round; vector-effect: non-scaling-stroke; pointer-events: none; }
+.electrical-switch .electrical-glyph { stroke: #315e53; }
 .electrical-marker:hover .electrical-symbol, .electrical-marker:focus .electrical-symbol { stroke-width: 4; }
 .wall-line { fill: none; stroke: #303531; stroke-linecap: square; vector-effect: non-scaling-stroke; }
 .wall-line.uncertain { stroke: var(--warning); stroke-dasharray: 7 5; }
@@ -264,8 +275,10 @@ dialog::backdrop { background: rgba(32,36,31,.42); backdrop-filter: blur(2px); }
 .dimension.uncertain .dimension-text { fill: #96541d; }
 .dimensions-hidden .dimension { display: none; }
 .dimension.scope-hidden { display: none; }
+.room-labels-hidden .room-label, .room-labels-hidden .room-area { display: none; }
 .features-hidden .feature { display: none; }
 .furniture-hidden .furniture-group { display: none; }
+.electrical-hidden .electrical-marker { display: none; }
 .not-selectable { pointer-events: none; }
 .form-dialog form { padding: 18px; }
 .field-label { display: grid; gap: 7px; margin: 14px 0; color: var(--muted); font-size: .76rem; font-weight: 700; }

@@ -420,7 +420,7 @@ export function createSamplePlan() {
         { id: "sample-door", name: "洋室引き戸", kind: "door", roomIds: ["sample-ldk", "sample-room"], from: {x:180,y:530}, to: {x:320,y:530}, widthCm: 140, heightCm: 200, quality: "measured" },
       ],
       features: [
-        { id: "sample-closet", name: "収納（仮）", kind: "closet", roomId: "sample-ldk", elevationWallId: "sample-ldk-wall-0", elevationOffsetCm: 360, elevationWidthCm: 140, x:420, y:80, width:140, height:70, derivedInteriorHeightCm: 220, shelfUndersideHeightCm: 165, quality: "approximate", uncertain: true },
+        { id: "sample-closet", name: "収納（仮）", kind: "closet", roomId: "sample-ldk", elevationWallId: "sample-ldk-wall-0", elevationOffsetCm: 360, elevationWidthCm: 140, x:420, y:80, width:140, height:70, derivedInteriorHeightCm: 220, shelfUndersideHeightCm: 165, quality: "approximate", placementQuality: "approximate", uncertain: true },
       ],
       walls: [],
       electrical: {

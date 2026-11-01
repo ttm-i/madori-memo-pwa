@@ -5,9 +5,11 @@ import { detailMarkup, PlanRenderer } from "./renderer.js";
 const elements = Object.fromEntries([
   "menuButton", "dataMenu", "detailDialog", "detailType", "detailTitle", "detailBody", "fileInput",
   "importButton", "emptyImportButton", "exportButton", "resetButton", "sampleButton", "emptyState",
-  "planCanvas", "viewportLayer", "canvasFrame", "lockButton", "dimensionsButton", "fitButton", "undoButton",
+  "planCanvas", "viewportLayer", "canvasFrame", "lockButton", "fitButton", "undoButton",
+  "displayMenuButton", "displayMenu", "displayRoomLabelsToggle", "displayFeaturesToggle",
+  "displayFurnitureToggle", "displayElectricalToggle", "displayDimensionsToggle",
   "dimensionFilters", "dimensionFilterList", "selectionMenuButton", "selectionMenu", "selectionModeHint",
-  "furnitureMenuButton", "furnitureMenu", "furnitureLayerToggle", "snapToggle",
+  "furnitureMenuButton", "furnitureMenu", "snapToggle",
   "summaryTitle", "roomCount", "measuredCount", "uncertainCount", "connectionBadge", "saveStatus", "toast",
   "furnitureButton", "furnitureDialog", "furnitureForm", "cancelFurnitureButton",
   "furnitureName", "furnitureWidth", "furnitureDepth", "furnitureRoom", "furniturePreset",
@@ -370,7 +372,8 @@ function updateDimensionFilters() {
   const groups = activePlan ? [...new Set(activePlan.plan.dimensions.map(getDimensionGroup))] : [];
   const order = ["wet", "hall", "ldk", "bedroom", "balcony", "other"];
   groups.sort((first, second) => order.indexOf(first) - order.indexOf(second));
-  dimensionGroups = new Set(groups);
+  const retainedGroups = groups.filter((group) => dimensionGroups.has(group));
+  dimensionGroups = new Set(retainedGroups.length ? retainedGroups : groups);
   const makeChip = (value, label, checked = true) => {
     const wrapper = document.createElement("label");
     wrapper.className = "filter-chip";
@@ -381,10 +384,11 @@ function updateDimensionFilters() {
     wrapper.append(input, document.createTextNode(label));
     return wrapper;
   };
-  const chips = groups.length ? [makeChip("all", "すべて"), ...groups.map((group) => makeChip(group, DIMENSION_GROUP_LABELS[group] ?? group))] : [];
+  const allSelected = groups.length > 0 && groups.every((group) => dimensionGroups.has(group));
+  const chips = groups.length ? [makeChip("all", "すべて", allSelected), ...groups.map((group) => makeChip(group, DIMENSION_GROUP_LABELS[group] ?? group, dimensionGroups.has(group)))] : [];
   elements.dimensionFilterList.replaceChildren(...chips);
-  elements.dimensionFilters.hidden = !groups.length || elements.dimensionsButton.getAttribute("aria-pressed") !== "true";
-  renderer.setDimensionGroups(groups);
+  elements.dimensionFilters.hidden = !groups.length || !elements.displayDimensionsToggle.checked;
+  renderer.setDimensionGroups(dimensionGroups);
 
   for (const input of elements.dimensionFilterList.querySelectorAll("input")) {
     input.addEventListener("change", () => {
@@ -504,20 +508,13 @@ async function commitFurnitureChange(message) {
   showToast(message);
 }
 
-function toggleButton(button, callback) {
-  const next = button.getAttribute("aria-pressed") !== "true";
-  button.setAttribute("aria-pressed", String(next));
-  button.classList.toggle("is-active", next);
-  callback(next);
-}
-
 function setFurnitureVisible(value) {
-  elements.furnitureLayerToggle.checked = value;
+  elements.displayFurnitureToggle.checked = value;
   renderer.setFurnitureVisible(value);
 }
 
 function closeToolMenus(except = null) {
-  for (const [button, menu] of [[elements.selectionMenuButton, elements.selectionMenu], [elements.furnitureMenuButton, elements.furnitureMenu]]) {
+  for (const [button, menu] of [[elements.displayMenuButton, elements.displayMenu], [elements.selectionMenuButton, elements.selectionMenu], [elements.furnitureMenuButton, elements.furnitureMenu]]) {
     if (menu === except) continue;
     menu.hidden = true;
     button.setAttribute("aria-expanded", "false");
@@ -573,6 +570,10 @@ elements.wallScrollViewButton.addEventListener("click", () => setWallViewportMod
 elements.wallOverviewButton.addEventListener("click", () => setWallViewportMode("overview"));
 
 elements.menuButton.addEventListener("click", () => elements.dataMenu.showModal());
+elements.displayMenuButton.addEventListener("click", (event) => {
+  event.stopPropagation();
+  toggleToolMenu(elements.displayMenuButton, elements.displayMenu);
+});
 elements.selectionMenuButton.addEventListener("click", (event) => {
   event.stopPropagation();
   toggleToolMenu(elements.selectionMenuButton, elements.selectionMenu);
@@ -759,11 +760,14 @@ elements.lockButton.addEventListener("click", () => {
   showToast(locked ? "閲覧モードに切り替えました" : "家具などの編集操作ができます");
 });
 elements.snapToggle.addEventListener("change", () => renderer.setSnapEnabled(elements.snapToggle.checked));
-elements.furnitureLayerToggle.addEventListener("change", () => renderer.setFurnitureVisible(elements.furnitureLayerToggle.checked));
-elements.dimensionsButton.addEventListener("click", () => toggleButton(elements.dimensionsButton, (value) => {
-  renderer.setDimensionsVisible(value);
-  elements.dimensionFilters.hidden = !value || !activePlan?.plan.dimensions.length;
-}));
+elements.displayRoomLabelsToggle.addEventListener("change", () => renderer.setRoomLabelsVisible(elements.displayRoomLabelsToggle.checked));
+elements.displayFeaturesToggle.addEventListener("change", () => renderer.setFeaturesVisible(elements.displayFeaturesToggle.checked));
+elements.displayFurnitureToggle.addEventListener("change", () => renderer.setFurnitureVisible(elements.displayFurnitureToggle.checked));
+elements.displayElectricalToggle.addEventListener("change", () => renderer.setElectricalVisible(elements.displayElectricalToggle.checked));
+elements.displayDimensionsToggle.addEventListener("change", () => {
+  renderer.setDimensionsVisible(elements.displayDimensionsToggle.checked);
+  elements.dimensionFilters.hidden = !elements.displayDimensionsToggle.checked || !activePlan?.plan.dimensions.length;
+});
 elements.fitButton.addEventListener("click", () => renderer.fit());
 window.addEventListener("online", updateConnection);
 window.addEventListener("offline", updateConnection);

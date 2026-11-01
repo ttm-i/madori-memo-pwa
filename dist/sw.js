@@ -1,4 +1,4 @@
-const CACHE_NAME = "floor-plan-shell-v27";
+const CACHE_NAME = "floor-plan-shell-v28";
 const APP_SHELL = [
   "./",
   "./index.html",

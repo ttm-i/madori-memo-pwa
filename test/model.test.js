@@ -82,6 +82,26 @@ test("electrical detail uses outlet-specific fields", () => {
   assert.match(markup, /プレート中心/);
 });
 
+test("feature detail separates dimension quality from placement quality", () => {
+  const markup = detailMarkup("feature", {
+    name: "収納",
+    widthCm: 120,
+    quality: "measured",
+    placementQuality: "approximate",
+  });
+  assert.match(markup, /寸法: 実測/);
+  assert.match(markup, /配置: 要確認/);
+});
+
+test("plan styles can independently hide each display layer", () => {
+  const css = readFileSync(new URL("../dist/styles.css", import.meta.url), "utf8");
+  assert.match(css, /room-labels-hidden/);
+  assert.match(css, /dimensions-hidden/);
+  assert.match(css, /features-hidden/);
+  assert.match(css, /furniture-hidden/);
+  assert.match(css, /electrical-hidden/);
+});
+
 test("custom elevations can replace a room edge and omit a non-wall opening", () => {
   const sample = createSamplePlan();
   const room = sample.plan.rooms.find((item) => item.id === "sample-room");

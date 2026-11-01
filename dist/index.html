@@ -38,7 +38,25 @@
         <section id="planView" class="view is-active" aria-label="2D間取り">
           <div class="toolbar" aria-label="図面表示設定">
             <button id="lockButton" class="tool-button is-active" type="button" aria-pressed="true">🔒 閲覧</button>
-            <button id="dimensionsButton" class="tool-button is-active" type="button" aria-pressed="true">寸法</button>
+            <div class="tool-menu">
+              <button id="displayMenuButton" class="tool-button" type="button" aria-expanded="false" aria-controls="displayMenu">表示⌄</button>
+              <div id="displayMenu" class="tool-popover display-popover" hidden>
+                <p class="popover-title">表示する要素</p>
+                <label><input id="displayRoomLabelsToggle" type="checkbox" checked /> 部屋名</label>
+                <label><input id="displayFeaturesToggle" type="checkbox" checked /> 固定設備</label>
+                <label><input id="displayFurnitureToggle" type="checkbox" checked /> 家具</label>
+                <label><input id="displayElectricalToggle" type="checkbox" checked /> コンセント・スイッチ</label>
+                <label><input id="displayDimensionsToggle" type="checkbox" checked /> 寸法</label>
+                <div id="dimensionFilters" class="dimension-filter-popover" aria-label="表示する寸法">
+                  <span class="filter-title">寸法を表示する場所</span>
+                  <div id="dimensionFilterList" class="filter-options"></div>
+                </div>
+                <div class="placement-legend" aria-label="固定設備の配置確度">
+                  <span><i class="placement-confirmed"></i>配置確認済み</span>
+                  <span><i class="placement-uncertain"></i>配置要確認</span>
+                </div>
+              </div>
+            </div>
             <div class="tool-menu">
               <button id="selectionMenuButton" class="tool-button" type="button" aria-expanded="false" aria-controls="selectionMenu">選択対象⌄</button>
               <div id="selectionMenu" class="tool-popover" hidden>
@@ -56,15 +74,9 @@
               <div id="furnitureMenu" class="tool-popover" hidden>
                 <button id="furnitureButton" class="popover-action" type="button">＋ 家具を追加</button>
                 <button id="furnitureListButton" class="popover-action" type="button">家具一覧</button>
-                <label class="popover-toggle"><input id="furnitureLayerToggle" type="checkbox" checked /> 家具を表示</label>
                 <label class="popover-toggle subdued"><input id="snapToggle" type="checkbox" checked /> 5cm単位で吸着</label>
               </div>
             </div>
-          </div>
-
-          <div id="dimensionFilters" class="filter-panel" aria-label="表示する寸法">
-            <span class="filter-title">表示する寸法</span>
-            <div id="dimensionFilterList" class="filter-options"></div>
           </div>
 
           <div id="canvasFrame" class="canvas-frame">

@@ -95,8 +95,9 @@ export class PlanRenderer {
     }
 
     for (const feature of documentData.plan.features ?? []) {
-      const group = svg("g", { class: `feature ${feature.uncertain ? "uncertain" : ""} ${this.isSelectable("equipment") ? "" : "not-selectable"}` });
-      const rect = svg("rect", { class: `feature-shape ${feature.uncertain ? "uncertain" : ""}`, x: feature.x, y: feature.y, width: feature.width, height: feature.height, rx: 4, tabindex: 0, role: "button", "aria-label": feature.name });
+      const placementUncertain = feature.placementQuality ? feature.placementQuality !== "confirmed" : Boolean(feature.uncertain);
+      const group = svg("g", { class: `feature ${placementUncertain ? "placement-uncertain" : ""} ${this.isSelectable("equipment") ? "" : "not-selectable"}` });
+      const rect = svg("rect", { class: `feature-shape ${placementUncertain ? "placement-uncertain" : ""}`, x: feature.x, y: feature.y, width: feature.width, height: feature.height, rx: 4, tabindex: 0, role: "button", "aria-label": feature.name });
       rect.addEventListener("click", () => { if (this.isSelectable("equipment")) this.onSelect("feature", feature); });
       group.append(rect);
       if (feature.shortLabel) {
@@ -130,11 +131,19 @@ export class PlanRenderer {
           x2: position.display.x, y2: position.display.y,
         }));
       }
-      group.append(
-        svg("circle", { class: "electrical-hit", cx: position.display.x, cy: position.display.y, r: 25 }),
-        svg("circle", { class: "electrical-symbol", cx: position.display.x, cy: position.display.y, r: 12 }),
-        svg("text", { class: "electrical-label", x: position.display.x, y: position.display.y + 4 }, electrical.sourceLabel ?? (electrical.electricalType === "outlet" ? "C" : "S")),
-      );
+      group.append(svg("circle", { class: "electrical-hit", cx: position.display.x, cy: position.display.y, r: 25 }));
+      if (electrical.electricalType === "outlet") {
+        group.append(
+          svg("circle", { class: "electrical-symbol", cx: position.display.x, cy: position.display.y, r: 12 }),
+          svg("line", { class: "electrical-glyph", x1: position.display.x - 4, y1: position.display.y - 5, x2: position.display.x - 4, y2: position.display.y + 5 }),
+          svg("line", { class: "electrical-glyph", x1: position.display.x + 4, y1: position.display.y - 5, x2: position.display.x + 4, y2: position.display.y + 5 }),
+        );
+      } else {
+        group.append(
+          svg("rect", { class: "electrical-symbol", x: position.display.x - 11, y: position.display.y - 11, width: 22, height: 22, rx: 4 }),
+          svg("line", { class: "electrical-glyph", x1: position.display.x - 5, y1: position.display.y + 5, x2: position.display.x + 5, y2: position.display.y - 5 }),
+        );
+      }
       group.addEventListener("click", (event) => {
         event.stopPropagation();
         if (selectable) this.onSelect(electrical.electricalType, electrical);
@@ -257,9 +266,11 @@ export class PlanRenderer {
     this.locked = value;
     this.svg.classList.toggle("editing", !value);
   }
+  setRoomLabelsVisible(value) { this.svg.classList.toggle("room-labels-hidden", !value); }
   setDimensionsVisible(value) { this.svg.classList.toggle("dimensions-hidden", !value); }
   setFeaturesVisible(value) { this.svg.classList.toggle("features-hidden", !value); }
   setFurnitureVisible(value) { this.svg.classList.toggle("furniture-hidden", !value); }
+  setElectricalVisible(value) { this.svg.classList.toggle("electrical-hidden", !value); }
   setSnapEnabled(value) { this.snapEnabled = value; }
   setDimensionGroups(groups) {
     this.dimensionGroups = groups == null ? null : new Set(groups);
@@ -466,6 +477,9 @@ export function detailMarkup(type, item) {
   if (type === "furniture" && item.placement && !item.placement.inside) warnings.push("指定した部屋から家具がはみ出しています。");
   if (type === "furniture" && item.conflicts?.length) warnings.push(`重なり: ${item.conflicts.map((conflict) => escapeHTML(conflict.name)).join("、")}`);
   const warning = warnings.length ? `<p class="placement-alert">${warnings.join("<br>")}</p>` : "";
-  return `${list}${warning}<span class="quality-tag ${escapeHTML(quality)}">${safeQuality}</span>${item.note ? `<p>${escapeHTML(item.note)}</p>` : ""}`;
+  const qualityTags = type === "feature"
+    ? `<div class="quality-tags"><span class="quality-tag ${escapeHTML(quality)}">寸法: ${safeQuality}</span><span class="quality-tag placement ${escapeHTML(item.placementQuality ?? (item.uncertain ? "approximate" : "confirmed"))}">配置: ${item.placementQuality === "confirmed" || (!item.placementQuality && !item.uncertain) ? "確認済み" : "要確認"}</span></div>`
+    : `<span class="quality-tag ${escapeHTML(quality)}">${safeQuality}</span>`;
+  return `${list}${warning}${qualityTags}${item.note ? `<p>${escapeHTML(item.note)}</p>` : ""}`;
 }
 
