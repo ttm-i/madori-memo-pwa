@@ -25,19 +25,23 @@ export function zoomTransformAround(transform, previousAnchor, nextAnchor, facto
 }
 
 export class PlanRenderer {
-  constructor(svgElement, layer, onSelect, onFurnitureEvent) {
+  constructor(svgElement, layer, onSelect, onFurnitureEvent, onViewChange) {
     this.svg = svgElement;
     this.layer = layer;
     this.onSelect = onSelect;
     this.onFurnitureEvent = onFurnitureEvent;
+    this.onViewChange = onViewChange;
     this.transform = { x: 70, y: 50, scale: 0.78 };
+    this.fitTransform = null;
     this.pointers = new Map();
     this.locked = true;
     this.snapEnabled = true;
     this.draggingFurniture = null;
     this.draggingDimension = null;
     this.selectedFurnitureId = null;
-    this.dimensionScope = "all";
+    this.dimensionGroups = null;
+    this.selectableTypes = new Set(["room", "dimension", "equipment", "furniture"]);
+    this.suppressNextClick = false;
     this.bindGestures();
   }
 
@@ -54,9 +58,9 @@ export class PlanRenderer {
 
     const content = svg("g", { class: "plan-content" });
     for (const room of documentData.plan.rooms) {
-      const group = svg("g", { "data-id": room.id });
+      const group = svg("g", { class: this.isSelectable("room") ? "" : "not-selectable", "data-id": room.id });
       const polygon = svg("polygon", { class: `room-shape ${room.uncertain ? "uncertain" : ""}`, points: pointsValue(room.points), fill: room.color ?? "#eee8d9" });
-      polygon.addEventListener("click", () => this.onSelect("room", room));
+      polygon.addEventListener("click", () => { if (this.isSelectable("room")) this.onSelect("room", room); });
       group.append(polygon);
       if (room.label) {
         group.append(svg("text", { class: "room-label", x: room.label.x, y: room.label.y }, room.name));
@@ -77,15 +81,15 @@ export class PlanRenderer {
     }
 
     for (const opening of documentData.plan.openings ?? []) {
-      const line = svg("line", { class: `opening-line ${opening.uncertain ? "uncertain" : ""}`, x1: opening.from.x, y1: opening.from.y, x2: opening.to.x, y2: opening.to.y, tabindex: 0, role: "button", "aria-label": opening.name });
-      line.addEventListener("click", () => this.onSelect("opening", opening));
+      const line = svg("line", { class: `opening-line ${opening.uncertain ? "uncertain" : ""} ${this.isSelectable("equipment") ? "" : "not-selectable"}`, x1: opening.from.x, y1: opening.from.y, x2: opening.to.x, y2: opening.to.y, tabindex: 0, role: "button", "aria-label": opening.name });
+      line.addEventListener("click", () => { if (this.isSelectable("equipment")) this.onSelect("opening", opening); });
       content.append(line);
     }
 
     for (const feature of documentData.plan.features ?? []) {
-      const group = svg("g", { class: `feature ${feature.uncertain ? "uncertain" : ""}` });
+      const group = svg("g", { class: `feature ${feature.uncertain ? "uncertain" : ""} ${this.isSelectable("equipment") ? "" : "not-selectable"}` });
       const rect = svg("rect", { class: `feature-shape ${feature.uncertain ? "uncertain" : ""}`, x: feature.x, y: feature.y, width: feature.width, height: feature.height, rx: 4, tabindex: 0, role: "button", "aria-label": feature.name });
-      rect.addEventListener("click", () => this.onSelect("feature", feature));
+      rect.addEventListener("click", () => { if (this.isSelectable("equipment")) this.onSelect("feature", feature); });
       group.append(rect);
       if (feature.shortLabel) {
         group.append(svg("text", {
@@ -102,7 +106,7 @@ export class PlanRenderer {
       const placement = analyzeFurniturePlacement(furniture, room);
       const conflicts = analyzeFurnitureConflicts(furniture, documentData.plan);
       const selected = furniture.id === this.selectedFurnitureId;
-      const group = svg("g", { class: `furniture-group ${selected ? "selected" : ""} ${placement.inside ? "" : "out-of-room"} ${conflicts.length ? "has-conflict" : ""}`, "data-furniture-id": furniture.id, tabindex: 0, role: "button", "aria-label": `${furniture.name}${placement.inside ? "" : " 部屋外"}${conflicts.length ? " 重なりあり" : ""}` });
+      const group = svg("g", { class: `furniture-group ${this.isSelectable("furniture") ? "" : "not-selectable"} ${selected ? "selected" : ""} ${placement.inside ? "" : "out-of-room"} ${conflicts.length ? "has-conflict" : ""}`, "data-furniture-id": furniture.id, tabindex: 0, role: "button", "aria-label": `${furniture.name}${placement.inside ? "" : " 部屋外"}${conflicts.length ? " 重なりあり" : ""}` });
       const rect = svg("rect", { class: "furniture-shape", x: furniture.x, y: furniture.y, width: furniture.widthCm, height: furniture.depthCm, rx: 5 });
       const label = svg("text", { class: "furniture-label", x: furniture.x + furniture.widthCm / 2, y: furniture.y + furniture.depthCm / 2 - 7 }, furniture.name);
       const sizeLabel = svg("text", { class: "furniture-size-label", x: furniture.x + furniture.widthCm / 2, y: furniture.y + furniture.depthCm / 2 + 10 }, `${furniture.widthCm}×${furniture.depthCm}`);
@@ -130,16 +134,23 @@ export class PlanRenderer {
         const warning = !placement.inside && conflicts.length ? "⚠ 部屋外・重なり" : !placement.inside ? "⚠ 部屋外" : "⚠ 重なり";
         group.append(svg("text", { class: "placement-warning", x: furniture.x + furniture.widthCm / 2, y: furniture.y - 10 }, warning));
       }
-      group.addEventListener("click", () => { if (this.locked) this.onSelect("furniture", furniture); });
+      group.addEventListener("click", (event) => {
+        event.stopPropagation();
+        if (this.suppressNextClick) {
+          this.suppressNextClick = false;
+          return;
+        }
+        if (this.isSelectable("furniture")) this.onSelect("furniture", furniture);
+      });
       group.addEventListener("pointerdown", (event) => {
-        if (this.locked) return;
+        if (this.locked || !this.isSelectable("furniture")) return;
         event.stopPropagation();
         event.currentTarget.setPointerCapture?.(event.pointerId);
-        this.onFurnitureEvent?.("start");
         this.draggingFurniture = {
           furniture, rect, label, sizeLabel,
           clientX: event.clientX, clientY: event.clientY,
           startX: furniture.x, startY: furniture.y,
+          moved: false,
         };
       });
       content.append(group);
@@ -150,7 +161,7 @@ export class PlanRenderer {
       const horizontal = Math.abs(dimension.to.x - dimension.from.x) >= Math.abs(dimension.to.y - dimension.from.y);
       const dimensionGroup = getDimensionGroup(dimension);
       const group = svg("g", {
-        class: `dimension ${horizontal ? "horizontal" : "vertical"} ${dimension.uncertain ? "uncertain" : ""} ${this.dimensionScope !== "all" && this.dimensionScope !== dimensionGroup ? "scope-hidden" : ""}`,
+        class: `dimension ${horizontal ? "horizontal" : "vertical"} ${dimension.uncertain ? "uncertain" : ""} ${this.dimensionGroups && !this.dimensionGroups.has(dimensionGroup) ? "scope-hidden" : ""} ${this.isSelectable("dimension") ? "" : "not-selectable"}`,
         "data-dimension-group": dimensionGroup,
         tabindex: 0,
         role: "button",
@@ -182,16 +193,18 @@ export class PlanRenderer {
       group.append(svg("text", { class: "dimension-text", x: midX, y: midY }, label));
       group.addEventListener("click", (event) => {
         event.stopPropagation();
-        if (!this.locked) return;
-        this.onSelect("dimension", { ...dimension, name: dimension.name ?? "寸法" });
+        if (this.suppressNextClick) {
+          this.suppressNextClick = false;
+          return;
+        }
+        if (this.isSelectable("dimension")) this.onSelect("dimension", { ...dimension, name: dimension.name ?? "寸法" });
       });
       group.addEventListener("pointerdown", (event) => {
-        if (this.locked) return;
+        if (this.locked || !this.isSelectable("dimension")) return;
         event.preventDefault();
         event.stopPropagation();
         event.currentTarget.setPointerCapture?.(event.pointerId);
-        this.onFurnitureEvent?.("start");
-        this.draggingDimension = { dimension, group, horizontal, clientX: event.clientX, clientY: event.clientY, offset: 0 };
+        this.draggingDimension = { dimension, group, horizontal, clientX: event.clientX, clientY: event.clientY, offset: 0, moved: false };
       });
       content.append(group);
     }
@@ -204,16 +217,20 @@ export class PlanRenderer {
     this.svg.classList.toggle("editing", !value);
   }
   setDimensionsVisible(value) { this.svg.classList.toggle("dimensions-hidden", !value); }
-  setUncertaintyVisible(value) { this.svg.classList.toggle("uncertainty-hidden", !value); }
   setFeaturesVisible(value) { this.svg.classList.toggle("features-hidden", !value); }
   setFurnitureVisible(value) { this.svg.classList.toggle("furniture-hidden", !value); }
   setSnapEnabled(value) { this.snapEnabled = value; }
-  setDimensionScope(value) {
-    this.dimensionScope = value;
+  setDimensionGroups(groups) {
+    this.dimensionGroups = groups == null ? null : new Set(groups);
     this.layer.querySelectorAll(".dimension").forEach((group) => {
-      group.classList.toggle("scope-hidden", value !== "all" && group.dataset.dimensionGroup !== value);
+      group.classList.toggle("scope-hidden", this.dimensionGroups != null && !this.dimensionGroups.has(group.dataset.dimensionGroup));
     });
   }
+  setSelectableTypes(types) {
+    this.selectableTypes = new Set(types);
+    if (this.document) this.render(this.document);
+  }
+  isSelectable(type) { return this.selectableTypes.has(type); }
   setSelectedFurniture(id) {
     this.selectedFurnitureId = id;
     if (this.document) this.render(this.document);
@@ -227,12 +244,19 @@ export class PlanRenderer {
     this.transform.scale = Math.max(0.15, scale);
     this.transform.x = (viewport.width - bounds.width * scale) / 2 - bounds.x * scale;
     this.transform.y = (viewport.height - bounds.height * scale) / 2 - bounds.y * scale;
+    this.fitTransform = { ...this.transform };
     this.applyTransform();
   }
 
   applyTransform() {
     const { x, y, scale } = this.transform;
     this.layer.setAttribute("transform", `translate(${x} ${y}) scale(${scale})`);
+    const changed = this.fitTransform != null && (
+      Math.abs(x - this.fitTransform.x) > 0.5
+      || Math.abs(y - this.fitTransform.y) > 0.5
+      || Math.abs(scale - this.fitTransform.scale) > 0.001
+    );
+    this.onViewChange?.(changed);
   }
 
   bindGestures() {
@@ -243,6 +267,11 @@ export class PlanRenderer {
     this.svg.addEventListener("pointermove", (event) => {
       if (this.draggingFurniture) {
         const drag = this.draggingFurniture;
+        if (!drag.moved && Math.hypot(event.clientX - drag.clientX, event.clientY - drag.clientY) < 4) return;
+        if (!drag.moved) {
+          drag.moved = true;
+          this.onFurnitureEvent?.("start");
+        }
         const rect = this.svg.getBoundingClientRect();
         const viewport = this.svg.viewBox.baseVal;
         const dx = (event.clientX - drag.clientX) * viewport.width / rect.width / this.transform.scale;
@@ -259,6 +288,11 @@ export class PlanRenderer {
       }
       if (this.draggingDimension) {
         const drag = this.draggingDimension;
+        if (!drag.moved && Math.hypot(event.clientX - drag.clientX, event.clientY - drag.clientY) < 4) return;
+        if (!drag.moved) {
+          drag.moved = true;
+          this.onFurnitureEvent?.("start");
+        }
         const rect = this.svg.getBoundingClientRect();
         const viewport = this.svg.viewBox.baseVal;
         const dx = (event.clientX - drag.clientX) * viewport.width / rect.width / this.transform.scale;
@@ -302,13 +336,21 @@ export class PlanRenderer {
     });
     const release = (event) => {
       if (this.draggingFurniture) {
+        const moved = this.draggingFurniture.moved;
         this.draggingFurniture = null;
-        this.onFurnitureEvent?.("commit");
+        if (moved) {
+          this.suppressNextClick = true;
+          setTimeout(() => { this.suppressNextClick = false; }, 0);
+          this.onFurnitureEvent?.("commit");
+        }
         return;
       }
       if (this.draggingDimension) {
         const drag = this.draggingDimension;
         this.draggingDimension = null;
+        if (!drag.moved) return;
+        this.suppressNextClick = true;
+        setTimeout(() => { this.suppressNextClick = false; }, 0);
         moveDimensionGuide(drag.dimension, Math.round(drag.offset * 10) / 10);
         this.render(this.document);
         this.onFurnitureEvent?.("commit");

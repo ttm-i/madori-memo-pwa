@@ -5,10 +5,11 @@ import { detailMarkup, PlanRenderer } from "./renderer.js";
 const elements = Object.fromEntries([
   "menuButton", "dataMenu", "detailDialog", "detailType", "detailTitle", "detailBody", "fileInput",
   "importButton", "emptyImportButton", "exportButton", "resetButton", "sampleButton", "emptyState",
-  "planCanvas", "viewportLayer", "lockButton", "dimensionsButton", "uncertaintyButton", "fitButton",
-  "snapButton", "dimensionScope", "equipmentButton", "furnitureLayerButton",
+  "planCanvas", "viewportLayer", "canvasFrame", "lockButton", "dimensionsButton", "fitButton", "undoButton",
+  "dimensionFilters", "dimensionFilterList", "selectionMenuButton", "selectionMenu", "selectionModeHint",
+  "furnitureMenuButton", "furnitureMenu", "furnitureLayerToggle", "snapToggle",
   "summaryTitle", "roomCount", "measuredCount", "uncertainCount", "connectionBadge", "saveStatus", "toast",
-  "furnitureButton", "undoButton", "furnitureDialog", "furnitureForm", "cancelFurnitureButton",
+  "furnitureButton", "furnitureDialog", "furnitureForm", "cancelFurnitureButton",
   "furnitureName", "furnitureWidth", "furnitureDepth", "furnitureRoom", "furniturePreset",
   "furnitureActions", "rotateFurnitureButton", "duplicateFurnitureButton", "deleteFurnitureButton",
   "furnitureRoomEditGroup", "furnitureRoomEdit",
@@ -20,11 +21,21 @@ let activePlan = null;
 let toastTimer = null;
 let selectedFurnitureId = null;
 let editingFurnitureId = null;
+let locked = true;
+let dimensionGroups = new Set();
+const selectableByMode = {
+  view: new Set(["room", "dimension", "equipment", "furniture"]),
+  edit: new Set(["furniture"]),
+};
 const history = [];
-const renderer = new PlanRenderer(elements.planCanvas, elements.viewportLayer, showDetail, handleFurnitureEvent);
+const renderer = new PlanRenderer(elements.planCanvas, elements.viewportLayer, showDetail, handleFurnitureEvent, handleViewChange);
 
 function updateUndoButton() {
-  elements.undoButton.disabled = history.length === 0;
+  elements.undoButton.hidden = history.length === 0;
+}
+
+function handleViewChange(changed) {
+  elements.fitButton.hidden = !activePlan || !changed;
 }
 
 function pushHistory() {
@@ -76,23 +87,43 @@ function updateSummary() {
   elements.uncertainCount.textContent = counts.uncertain;
 }
 
-function updateDimensionScopes() {
+function updateDimensionFilters() {
   const groups = activePlan ? [...new Set(activePlan.plan.dimensions.map(getDimensionGroup))] : [];
   const order = ["wet", "hall", "ldk", "bedroom", "balcony", "other"];
   groups.sort((first, second) => order.indexOf(first) - order.indexOf(second));
-  elements.dimensionScope.replaceChildren(
-    new Option("すべての寸法", "all"),
-    ...groups.map((group) => new Option(DIMENSION_GROUP_LABELS[group] ?? group, group)),
-  );
-  elements.dimensionScope.disabled = !activePlan;
-  renderer.setDimensionScope("all");
+  dimensionGroups = new Set(groups);
+  const makeChip = (value, label, checked = true) => {
+    const wrapper = document.createElement("label");
+    wrapper.className = "filter-chip";
+    const input = document.createElement("input");
+    input.type = "checkbox";
+    input.value = value;
+    input.checked = checked;
+    wrapper.append(input, document.createTextNode(label));
+    return wrapper;
+  };
+  const chips = groups.length ? [makeChip("all", "すべて"), ...groups.map((group) => makeChip(group, DIMENSION_GROUP_LABELS[group] ?? group))] : [];
+  elements.dimensionFilterList.replaceChildren(...chips);
+  elements.dimensionFilters.hidden = !groups.length || elements.dimensionsButton.getAttribute("aria-pressed") !== "true";
+  renderer.setDimensionGroups(groups);
+
+  for (const input of elements.dimensionFilterList.querySelectorAll("input")) {
+    input.addEventListener("change", () => {
+      const groupInputs = [...elements.dimensionFilterList.querySelectorAll('input:not([value="all"])')];
+      const allInput = elements.dimensionFilterList.querySelector('input[value="all"]');
+      if (input.value === "all") groupInputs.forEach((item) => { item.checked = input.checked; });
+      dimensionGroups = new Set(groupInputs.filter((item) => item.checked).map((item) => item.value));
+      allInput.checked = groupInputs.length > 0 && groupInputs.every((item) => item.checked);
+      renderer.setDimensionGroups(dimensionGroups);
+    });
+  }
 }
 
 async function setActivePlan(plan, { persist = true } = {}) {
   activePlan = plan;
   renderer.render(plan);
   updateSummary();
-  updateDimensionScopes();
+  updateDimensionFilters();
   requestAnimationFrame(() => renderer.fit());
   if (persist) {
     await persistActivePlan();
@@ -122,9 +153,14 @@ function exportPlan() {
 function showDetail(type, item) {
   selectedFurnitureId = type === "furniture" ? item.id : null;
   renderer.setSelectedFurniture(selectedFurnitureId);
-  elements.furnitureActions.hidden = type !== "furniture";
-  elements.furnitureRoomEditGroup.hidden = type !== "furniture";
-  elements.detailType.textContent = type.toUpperCase();
+  const furnitureEditable = type === "furniture" && !locked;
+  elements.furnitureActions.hidden = !furnitureEditable;
+  elements.furnitureRoomEditGroup.hidden = !furnitureEditable;
+  const typeLabels = { room: "ROOM", dimension: "DIMENSION", opening: "OPENING", feature: "EQUIPMENT", furniture: "FURNITURE" };
+  const detailClasses = ["detail-room", "detail-dimension", "detail-equipment", "detail-furniture"];
+  elements.detailDialog.classList.remove(...detailClasses);
+  elements.detailDialog.classList.add(type === "room" ? "detail-room" : type === "dimension" ? "detail-dimension" : type === "furniture" ? "detail-furniture" : "detail-equipment");
+  elements.detailType.textContent = typeLabels[type] ?? "DETAIL";
   elements.detailTitle.textContent = item.name;
   const room = type === "furniture" ? activePlan.plan.rooms.find((candidate) => candidate.id === item.roomId) : null;
   const detailItem = room ? { ...item, roomName: room.name, placement: analyzeFurniturePlacement(item, room), conflicts: analyzeFurnitureConflicts(item, activePlan.plan) } : item;
@@ -167,7 +203,7 @@ function renderFurnitureList() {
     row.append(name, roomLabel, size);
     row.addEventListener("click", () => {
       elements.furnitureListDialog.close();
-      ensureToggleOn(elements.furnitureLayerButton, (value) => renderer.setFurnitureVisible(value));
+      setFurnitureVisible(true);
       showDetail("furniture", furniture);
     });
     return row;
@@ -191,11 +227,32 @@ function toggleButton(button, callback) {
   callback(next);
 }
 
-function ensureToggleOn(button, callback) {
-  if (button.getAttribute("aria-pressed") === "true") return;
-  button.setAttribute("aria-pressed", "true");
-  button.classList.add("is-active");
-  callback(true);
+function setFurnitureVisible(value) {
+  elements.furnitureLayerToggle.checked = value;
+  renderer.setFurnitureVisible(value);
+}
+
+function closeToolMenus(except = null) {
+  for (const [button, menu] of [[elements.selectionMenuButton, elements.selectionMenu], [elements.furnitureMenuButton, elements.furnitureMenu]]) {
+    if (menu === except) continue;
+    menu.hidden = true;
+    button.setAttribute("aria-expanded", "false");
+  }
+}
+
+function toggleToolMenu(button, menu) {
+  const willOpen = menu.hidden;
+  closeToolMenus(menu);
+  menu.hidden = !willOpen;
+  button.setAttribute("aria-expanded", String(willOpen));
+}
+
+function syncSelectableControls() {
+  const mode = locked ? "view" : "edit";
+  const selected = selectableByMode[mode];
+  elements.selectionModeHint.textContent = locked ? "閲覧モードの設定" : "編集モードの設定";
+  document.querySelectorAll("[data-selectable]").forEach((input) => { input.checked = selected.has(input.dataset.selectable); });
+  renderer.setSelectableTypes(selected);
 }
 
 document.querySelectorAll(".tab").forEach((tab) => tab.addEventListener("click", () => {
@@ -205,6 +262,23 @@ document.querySelectorAll(".tab").forEach((tab) => tab.addEventListener("click",
 }));
 
 elements.menuButton.addEventListener("click", () => elements.dataMenu.showModal());
+elements.selectionMenuButton.addEventListener("click", (event) => {
+  event.stopPropagation();
+  toggleToolMenu(elements.selectionMenuButton, elements.selectionMenu);
+});
+elements.furnitureMenuButton.addEventListener("click", (event) => {
+  event.stopPropagation();
+  toggleToolMenu(elements.furnitureMenuButton, elements.furnitureMenu);
+});
+document.addEventListener("click", (event) => {
+  if (!event.target.closest(".tool-menu")) closeToolMenus();
+});
+document.querySelectorAll("[data-selectable]").forEach((input) => input.addEventListener("change", () => {
+  const selected = selectableByMode[locked ? "view" : "edit"];
+  if (input.checked) selected.add(input.dataset.selectable);
+  else selected.delete(input.dataset.selectable);
+  renderer.setSelectableTypes(selected);
+}));
 [elements.importButton, elements.emptyImportButton].forEach((button) => button.addEventListener("click", () => elements.fileInput.click()));
 elements.fileInput.addEventListener("change", async () => {
   const [file] = elements.fileInput.files;
@@ -215,6 +289,7 @@ elements.fileInput.addEventListener("change", async () => {
 elements.exportButton.addEventListener("click", exportPlan);
 elements.sampleButton.addEventListener("click", () => setActivePlan(createSamplePlan()).then(() => showToast("架空サンプルを読み込みました")));
 elements.furnitureButton.addEventListener("click", () => {
+  closeToolMenus();
   if (!activePlan) return showToast("先に間取りデータを読み込んでください");
   editingFurnitureId = null;
   elements.furnitureRoom.replaceChildren(...activePlan.plan.rooms.map((room) => new Option(room.name, room.id)));
@@ -227,6 +302,7 @@ elements.furnitureButton.addEventListener("click", () => {
   elements.furnitureDialog.showModal();
 });
 elements.furnitureListButton.addEventListener("click", () => {
+  closeToolMenus();
   if (!activePlan) return showToast("先に間取りデータを読み込んでください");
   renderFurnitureList();
   elements.furnitureListDialog.showModal();
@@ -270,7 +346,7 @@ elements.furnitureForm.addEventListener("submit", async (event) => {
   }
   const anchor = room.label ?? room.points[0];
   pushHistory();
-  ensureToggleOn(elements.furnitureLayerButton, (value) => renderer.setFurnitureVisible(value));
+  setFurnitureVisible(true);
   activePlan.plan.furniture.push({
     id: crypto.randomUUID(),
     name,
@@ -287,6 +363,7 @@ elements.furnitureForm.addEventListener("submit", async (event) => {
   showToast("家具を追加しました。編集モードで移動できます");
 });
 elements.editFurnitureButton.addEventListener("click", () => {
+  if (locked) return;
   const furniture = selectedFurniture();
   if (!furniture) return;
   editingFurnitureId = furniture.id;
@@ -301,6 +378,7 @@ elements.editFurnitureButton.addEventListener("click", () => {
   elements.furnitureDialog.showModal();
 });
 elements.rotateFurnitureButton.addEventListener("click", async () => {
+  if (locked) return;
   const furniture = selectedFurniture();
   if (!furniture) return;
   pushHistory();
@@ -308,6 +386,7 @@ elements.rotateFurnitureButton.addEventListener("click", async () => {
   await commitFurnitureChange("家具を90°回転しました");
 });
 elements.duplicateFurnitureButton.addEventListener("click", async () => {
+  if (locked) return;
   const furniture = selectedFurniture();
   if (!furniture) return;
   pushHistory();
@@ -315,6 +394,7 @@ elements.duplicateFurnitureButton.addEventListener("click", async () => {
   await commitFurnitureChange("家具を複製しました");
 });
 elements.deleteFurnitureButton.addEventListener("click", async () => {
+  if (locked) return;
   const furniture = selectedFurniture();
   if (!furniture || !confirm(`「${furniture.name}」を削除しますか？`)) return;
   pushHistory();
@@ -322,6 +402,7 @@ elements.deleteFurnitureButton.addEventListener("click", async () => {
   await commitFurnitureChange("家具を削除しました");
 });
 elements.furnitureRoomEdit.addEventListener("change", async () => {
+  if (locked) return;
   const furniture = selectedFurniture();
   if (!furniture || furniture.roomId === elements.furnitureRoomEdit.value) return;
   pushHistory();
@@ -346,32 +427,38 @@ elements.resetButton.addEventListener("click", async () => {
   if (!confirm("この端末に保存した間取りデータを消去しますか？")) return;
   await deleteActivePlan();
   activePlan = null;
+  history.length = 0;
   renderer.render(null);
   updateSummary();
-  updateDimensionScopes();
+  updateDimensionFilters();
+  updateUndoButton();
   elements.dataMenu.close();
   showToast("端末内データを消去しました");
 });
-elements.lockButton.addEventListener("click", () => toggleButton(elements.lockButton, (locked) => {
-  renderer.setLocked(locked);
+elements.lockButton.addEventListener("click", () => {
+  locked = !locked;
+  elements.lockButton.setAttribute("aria-pressed", String(locked));
+  elements.lockButton.classList.toggle("is-active", locked);
   elements.lockButton.textContent = locked ? "🔒 閲覧" : "🔓 編集";
-  if (!locked) showToast("家具と寸法ガイドをドラッグできます");
+  renderer.setLocked(locked);
+  syncSelectableControls();
+  closeToolMenus();
+  showToast(locked ? "閲覧モードに切り替えました" : "家具などの編集操作ができます");
+});
+elements.snapToggle.addEventListener("change", () => renderer.setSnapEnabled(elements.snapToggle.checked));
+elements.furnitureLayerToggle.addEventListener("change", () => renderer.setFurnitureVisible(elements.furnitureLayerToggle.checked));
+elements.dimensionsButton.addEventListener("click", () => toggleButton(elements.dimensionsButton, (value) => {
+  renderer.setDimensionsVisible(value);
+  elements.dimensionFilters.hidden = !value || !activePlan?.plan.dimensions.length;
 }));
-elements.snapButton.addEventListener("click", () => toggleButton(elements.snapButton, (value) => {
-  renderer.setSnapEnabled(value);
-  showToast(value ? "家具を5cm単位で吸着します" : "家具の吸着を解除しました");
-}));
-elements.dimensionsButton.addEventListener("click", () => toggleButton(elements.dimensionsButton, (value) => renderer.setDimensionsVisible(value)));
-elements.dimensionScope.addEventListener("change", () => renderer.setDimensionScope(elements.dimensionScope.value));
-elements.uncertaintyButton.addEventListener("click", () => toggleButton(elements.uncertaintyButton, (value) => renderer.setUncertaintyVisible(value)));
-elements.equipmentButton.addEventListener("click", () => toggleButton(elements.equipmentButton, (value) => renderer.setFeaturesVisible(value)));
-elements.furnitureLayerButton.addEventListener("click", () => toggleButton(elements.furnitureLayerButton, (value) => renderer.setFurnitureVisible(value)));
 elements.fitButton.addEventListener("click", () => renderer.fit());
 window.addEventListener("online", updateConnection);
 window.addEventListener("offline", updateConnection);
 
 updateConnection();
-updateDimensionScopes();
+updateDimensionFilters();
+syncSelectableControls();
+updateUndoButton();
 loadActivePlan().then((plan) => plan ? setActivePlan(validatePlan(plan), { persist: false }) : updateSummary()).catch(() => {
   updateSummary();
   showToast("端末内データを開けませんでした");

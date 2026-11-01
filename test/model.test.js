@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { analyzeFurnitureConflicts, analyzeFurniturePlacement, countQualities, createSamplePlan, duplicateFurniture, FORMAT, getDimensionGroup, moveDimensionGuide, pointInPolygon, rectanglesOverlap, rotateFurniture, snapToGrid, updateFurniture, validatePlan } from "../dist/model.js";
 import { zoomTransformAround } from "../dist/renderer.js";
 
@@ -114,5 +115,14 @@ test("zoom keeps the content under the pinch midpoint fixed", () => {
   assert.equal(zoomed.scale, 1);
   assert.equal(zoomed.x + contentPoint.x * zoomed.scale, nextAnchor.x);
   assert.equal(zoomed.y + contentPoint.y * zoomed.scale, nextAnchor.y);
+});
+
+test("all app element bindings exist in the HTML", () => {
+  const appSource = readFileSync(new URL("../dist/app.js", import.meta.url), "utf8");
+  const htmlSource = readFileSync(new URL("../dist/index.html", import.meta.url), "utf8");
+  const bindingBlock = appSource.match(/Object\.fromEntries\(\[([\s\S]*?)\]\.map/)[1];
+  const boundIds = [...bindingBlock.matchAll(/"([^"]+)"/g)].map((match) => match[1]);
+  const htmlIds = new Set([...htmlSource.matchAll(/id="([^"]+)"/g)].map((match) => match[1]));
+  assert.deepEqual(boundIds.filter((id) => !htmlIds.has(id)), []);
 });
 

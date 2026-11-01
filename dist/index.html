@@ -39,20 +39,36 @@
           <div class="toolbar" aria-label="図面表示設定">
             <button id="lockButton" class="tool-button is-active" type="button" aria-pressed="true">🔒 閲覧</button>
             <button id="dimensionsButton" class="tool-button is-active" type="button" aria-pressed="true">寸法</button>
-            <label class="tool-select">表示
-              <select id="dimensionScope" aria-label="寸法の表示範囲"><option value="all">すべての寸法</option></select>
-            </label>
-            <button id="uncertaintyButton" class="tool-button is-active" type="button" aria-pressed="true">要確認</button>
-            <button id="equipmentButton" class="tool-button is-active" type="button" aria-pressed="true">設備</button>
-            <button id="furnitureLayerButton" class="tool-button is-active" type="button" aria-pressed="true">家具表示</button>
-            <button id="furnitureListButton" class="tool-button" type="button">家具一覧</button>
-            <button id="furnitureButton" class="tool-button" type="button">＋ 家具</button>
-            <button id="snapButton" class="tool-button is-active" type="button" aria-pressed="true">5cm吸着</button>
-            <button id="undoButton" class="tool-button" type="button" disabled>元に戻す</button>
-            <button id="fitButton" class="tool-button" type="button">全体</button>
+            <div class="tool-menu">
+              <button id="selectionMenuButton" class="tool-button" type="button" aria-expanded="false" aria-controls="selectionMenu">選択対象⌄</button>
+              <div id="selectionMenu" class="tool-popover" hidden>
+                <p class="popover-title">タッチできる要素</p>
+                <label><input type="checkbox" data-selectable="room" /> 部屋</label>
+                <label><input type="checkbox" data-selectable="dimension" /> 寸法線</label>
+                <label><input type="checkbox" data-selectable="equipment" /> 設備・窓・ドア</label>
+                <label><input type="checkbox" data-selectable="furniture" /> 家具</label>
+                <p id="selectionModeHint" class="popover-help">閲覧モードの設定</p>
+              </div>
+            </div>
+            <div class="tool-menu">
+              <button id="furnitureMenuButton" class="tool-button" type="button" aria-expanded="false" aria-controls="furnitureMenu">家具⌄</button>
+              <div id="furnitureMenu" class="tool-popover" hidden>
+                <button id="furnitureButton" class="popover-action" type="button">＋ 家具を追加</button>
+                <button id="furnitureListButton" class="popover-action" type="button">家具一覧</button>
+                <label class="popover-toggle"><input id="furnitureLayerToggle" type="checkbox" checked /> 家具を表示</label>
+                <label class="popover-toggle subdued"><input id="snapToggle" type="checkbox" checked /> 5cm単位で吸着</label>
+              </div>
+            </div>
+          </div>
+
+          <div id="dimensionFilters" class="filter-panel" aria-label="表示する寸法">
+            <span class="filter-title">表示する寸法</span>
+            <div id="dimensionFilterList" class="filter-options"></div>
           </div>
 
           <div id="canvasFrame" class="canvas-frame">
+            <button id="undoButton" class="canvas-action undo-action" type="button" aria-label="元に戻す" title="元に戻す" hidden>↶</button>
+            <button id="fitButton" class="canvas-action fit-action" type="button" hidden>全体</button>
             <svg id="planCanvas" viewBox="0 0 800 1100" role="img" aria-labelledby="planTitle planDescription">
               <title id="planTitle">間取り平面図</title>
               <desc id="planDescription">読み込んだ間取りデータを表示します</desc>
