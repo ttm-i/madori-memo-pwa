@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { analyzeFurnitureConflicts, analyzeFurniturePlacement, countQualities, createSamplePlan, duplicateFurniture, FORMAT, getDimensionGroup, moveDimensionGuide, pointInPolygon, rectanglesOverlap, rotateFurniture, snapToGrid, updateFurniture, validatePlan } from "../dist/model.js";
+import { zoomTransformAround } from "../dist/renderer.js";
 
 test("sample plan conforms to the public schema", () => {
   const sample = createSamplePlan();
@@ -99,5 +100,19 @@ test("furniture editing preserves its center while changing size", () => {
   const furniture = { id: "f1", name: "家具", roomId: "ldk", x: 100, y: 200, widthCm: 100, depthCm: 50 };
   updateFurniture(furniture, { name: "テーブル", roomId: "bedroom", widthCm: 140, depthCm: 80 });
   assert.deepEqual(furniture, { id: "f1", name: "テーブル", roomId: "bedroom", x: 80, y: 185, widthCm: 140, depthCm: 80 });
+});
+
+test("zoom keeps the content under the pinch midpoint fixed", () => {
+  const transform = { x: 70, y: 50, scale: 0.5 };
+  const previousAnchor = { x: 300, y: 400 };
+  const nextAnchor = { x: 320, y: 410 };
+  const contentPoint = {
+    x: (previousAnchor.x - transform.x) / transform.scale,
+    y: (previousAnchor.y - transform.y) / transform.scale,
+  };
+  const zoomed = zoomTransformAround(transform, previousAnchor, nextAnchor, 2);
+  assert.equal(zoomed.scale, 1);
+  assert.equal(zoomed.x + contentPoint.x * zoomed.scale, nextAnchor.x);
+  assert.equal(zoomed.y + contentPoint.y * zoomed.scale, nextAnchor.y);
 });
 

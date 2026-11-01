@@ -13,6 +13,17 @@ function pointsValue(points) {
   return points.map((point) => `${point.x},${point.y}`).join(" ");
 }
 
+export function zoomTransformAround(transform, previousAnchor, nextAnchor, factor, minScale = 0.15, maxScale = 4) {
+  const scale = Math.min(maxScale, Math.max(minScale, transform.scale * factor));
+  const contentX = (previousAnchor.x - transform.x) / transform.scale;
+  const contentY = (previousAnchor.y - transform.y) / transform.scale;
+  return {
+    x: nextAnchor.x - contentX * scale,
+    y: nextAnchor.y - contentY * scale,
+    scale,
+  };
+}
+
 export class PlanRenderer {
   constructor(svgElement, layer, onSelect, onFurnitureEvent) {
     this.svg = svgElement;
@@ -21,7 +32,6 @@ export class PlanRenderer {
     this.onFurnitureEvent = onFurnitureEvent;
     this.transform = { x: 70, y: 50, scale: 0.78 };
     this.pointers = new Map();
-    this.lastDistance = null;
     this.locked = true;
     this.snapEnabled = true;
     this.draggingFurniture = null;
@@ -259,6 +269,7 @@ export class PlanRenderer {
       }
       if (!this.pointers.has(event.pointerId)) return;
       const previous = this.pointers.get(event.pointerId);
+      const previousValues = [...this.pointers.values()];
       this.pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
       const values = [...this.pointers.values()];
       if (values.length === 1) {
@@ -267,9 +278,25 @@ export class PlanRenderer {
         this.transform.x += (event.clientX - previous.x) * viewport.width / rect.width;
         this.transform.y += (event.clientY - previous.y) * viewport.height / rect.height;
       } else if (values.length === 2) {
+        const rect = this.svg.getBoundingClientRect();
+        const viewport = this.svg.viewBox.baseVal;
+        const toViewportPoint = (point) => ({
+          x: viewport.x + (point.x - rect.left) * viewport.width / rect.width,
+          y: viewport.y + (point.y - rect.top) * viewport.height / rect.height,
+        });
+        const previousDistance = Math.hypot(previousValues[1].x - previousValues[0].x, previousValues[1].y - previousValues[0].y);
         const distance = Math.hypot(values[1].x - values[0].x, values[1].y - values[0].y);
-        if (this.lastDistance) this.transform.scale = Math.min(4, Math.max(.15, this.transform.scale * (distance / this.lastDistance)));
-        this.lastDistance = distance;
+        if (previousDistance > 0) {
+          const previousMidpoint = toViewportPoint({
+            x: (previousValues[0].x + previousValues[1].x) / 2,
+            y: (previousValues[0].y + previousValues[1].y) / 2,
+          });
+          const midpoint = toViewportPoint({
+            x: (values[0].x + values[1].x) / 2,
+            y: (values[0].y + values[1].y) / 2,
+          });
+          this.transform = zoomTransformAround(this.transform, previousMidpoint, midpoint, distance / previousDistance);
+        }
       }
       this.applyTransform();
     });
@@ -288,14 +315,19 @@ export class PlanRenderer {
         return;
       }
       this.pointers.delete(event.pointerId);
-      if (this.pointers.size < 2) this.lastDistance = null;
     };
     this.svg.addEventListener("pointerup", release);
     this.svg.addEventListener("pointercancel", release);
     this.svg.addEventListener("wheel", (event) => {
       event.preventDefault();
       const factor = event.deltaY < 0 ? 1.08 : .92;
-      this.transform.scale = Math.min(4, Math.max(.15, this.transform.scale * factor));
+      const rect = this.svg.getBoundingClientRect();
+      const viewport = this.svg.viewBox.baseVal;
+      const anchor = {
+        x: viewport.x + (event.clientX - rect.left) * viewport.width / rect.width,
+        y: viewport.y + (event.clientY - rect.top) * viewport.height / rect.height,
+      };
+      this.transform = zoomTransformAround(this.transform, anchor, anchor, factor);
       this.applyTransform();
     }, { passive: false });
   }
