@@ -1,8 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { analyzeFurnitureConflicts, analyzeFurniturePlacement, buildElevationItems, buildRoomWalls, buildWallDiagram, countQualities, createSamplePlan, duplicateFurniture, FORMAT, getDimensionGroup, moveDimensionGuide, pointInPolygon, rectanglesOverlap, rotateFurniture, snapToGrid, updateFurniture, validatePlan, wallDisplayWidth } from "../dist/model.js";
-import { zoomTransformAround } from "../dist/renderer.js";
+import { analyzeFurnitureConflicts, analyzeFurniturePlacement, buildElevationItems, buildRoomWalls, buildWallDiagram, countQualities, createSamplePlan, duplicateFurniture, FORMAT, getDimensionGroup, getElectricalPlanPosition, moveDimensionGuide, pointInPolygon, rectanglesOverlap, rotateFurniture, snapToGrid, updateFurniture, validatePlan, wallDisplayWidth } from "../dist/model.js";
+import { detailMarkup, zoomTransformAround } from "../dist/renderer.js";
 
 test("sample plan conforms to the public schema", () => {
   const sample = createSamplePlan();
@@ -21,7 +21,7 @@ test("quality counts include uncertain room geometry", () => {
   const sample = createSamplePlan();
   sample.plan.rooms[0].uncertain = true;
   const counts = countQualities(sample);
-  assert.equal(counts.measured, 3);
+  assert.equal(counts.measured, 5);
   assert.equal(counts.uncertain, 3);
 });
 
@@ -58,6 +58,28 @@ test("wall elevations use a common room scale instead of stretching every wall",
   assert.equal(wallDisplayWidth(500, 500), 840);
   assert.equal(wallDisplayWidth(280, 500), 470.40000000000003);
   assert.equal(wallDisplayWidth(90, 500), 151.2);
+});
+
+test("electrical markers share wall coordinates between plan and elevation", () => {
+  const sample = createSamplePlan();
+  const outlet = sample.plan.electrical.outlets[0];
+  const position = getElectricalPlanPosition(sample, outlet);
+  assert.deepEqual(position, {
+    anchor: { x: 560, y: 150 },
+    display: { x: 544, y: 150 },
+  });
+  const diagram = buildWallDiagram(sample, "sample-ldk", "sample-ldk-wall-1");
+  assert(diagram.items.some((item) => item.id === "sample-outlet" && item.offsetCm === 86 && item.widthCm === 8 && item.topCm === 25));
+  assert(diagram.items.some((item) => item.id === "sample-switch" && item.offsetCm === 126 && item.widthCm === 8 && item.topCm === 120));
+});
+
+test("electrical detail uses outlet-specific fields", () => {
+  const sample = createSamplePlan();
+  const markup = detailMarkup("outlet", { ...sample.plan.electrical.outlets[0], roomName: "LDK" });
+  assert.match(markup, /コンセント/);
+  assert.match(markup, /2口/);
+  assert.match(markup, /床から 25 cm/);
+  assert.match(markup, /プレート中心/);
 });
 
 test("custom elevations can replace a room edge and omit a non-wall opening", () => {

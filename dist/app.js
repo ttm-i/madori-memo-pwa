@@ -1,5 +1,5 @@
 import { deleteActivePlan, loadActivePlan, saveActivePlan } from "./db.js";
-import { analyzeFurnitureConflicts, analyzeFurniturePlacement, buildElevationItems, buildRoomWalls, buildWallDiagram, countQualities, createSamplePlan, DIMENSION_GROUP_LABELS, duplicateFurniture, getDimensionGroup, rotateFurniture, updateFurniture, validatePlan, wallDisplayWidth } from "./model.js";
+import { analyzeFurnitureConflicts, analyzeFurniturePlacement, buildElevationItems, buildRoomWalls, buildWallDiagram, countQualities, createSamplePlan, DIMENSION_GROUP_LABELS, duplicateFurniture, getDimensionGroup, getElectricalPlanPosition, rotateFurniture, updateFurniture, validatePlan, wallDisplayWidth } from "./model.js";
 import { detailMarkup, PlanRenderer } from "./renderer.js";
 
 const elements = Object.fromEntries([
@@ -32,7 +32,7 @@ let selectedWallId = null;
 let wallDisplayMode = "diagram";
 let wallViewportMode = "scroll";
 const selectableByMode = {
-  view: new Set(["room", "dimension", "equipment", "furniture"]),
+  view: new Set(["room", "dimension", "equipment", "electrical", "furniture"]),
   edit: new Set(["furniture"]),
 };
 const history = [];
@@ -125,6 +125,21 @@ function renderWallPlan(room, walls) {
     elements.wallPlanSvg.append(wallSvg("line", {
       class: "wall-plan-opening",
       x1: opening.from.x, y1: opening.from.y, x2: opening.to.x, y2: opening.to.y,
+    }));
+  }
+  const electricalItems = [
+    ...(activePlan.plan.electrical?.outlets ?? []),
+    ...(activePlan.plan.electrical?.switches ?? []),
+  ];
+  for (const electrical of electricalItems) {
+    if (electrical.roomId !== room.id) continue;
+    const position = getElectricalPlanPosition(activePlan, electrical);
+    if (!position) continue;
+    elements.wallPlanSvg.append(wallSvg("circle", {
+      class: "wall-plan-electrical",
+      cx: position.anchor.x,
+      cy: position.anchor.y,
+      r: 7,
     }));
   }
   walls.forEach((wall, index) => {
@@ -423,14 +438,16 @@ function showDetail(type, item) {
   const furnitureEditable = type === "furniture" && !locked;
   elements.furnitureActions.hidden = !furnitureEditable;
   elements.furnitureRoomEditGroup.hidden = !furnitureEditable;
-  const typeLabels = { room: "ROOM", dimension: "DIMENSION", opening: "OPENING", feature: "EQUIPMENT", furniture: "FURNITURE" };
+  const typeLabels = { room: "ROOM", dimension: "DIMENSION", opening: "OPENING", feature: "EQUIPMENT", outlet: "OUTLET", switch: "SWITCH", furniture: "FURNITURE" };
   const detailClasses = ["detail-room", "detail-dimension", "detail-equipment", "detail-furniture"];
   elements.detailDialog.classList.remove(...detailClasses);
   elements.detailDialog.classList.add(type === "room" ? "detail-room" : type === "dimension" ? "detail-dimension" : type === "furniture" ? "detail-furniture" : "detail-equipment");
   elements.detailType.textContent = typeLabels[type] ?? "DETAIL";
   elements.detailTitle.textContent = item.name;
-  const room = type === "furniture" ? activePlan.plan.rooms.find((candidate) => candidate.id === item.roomId) : null;
-  const detailItem = room ? { ...item, roomName: room.name, placement: analyzeFurniturePlacement(item, room), conflicts: analyzeFurnitureConflicts(item, activePlan.plan) } : item;
+  const room = item.roomId ? activePlan.plan.rooms.find((candidate) => candidate.id === item.roomId) : null;
+  const detailItem = type === "furniture" && room
+    ? { ...item, roomName: room.name, placement: analyzeFurniturePlacement(item, room), conflicts: analyzeFurnitureConflicts(item, activePlan.plan) }
+    : room ? { ...item, roomName: room.name } : item;
   elements.detailBody.innerHTML = detailMarkup(type, detailItem);
   if (type === "furniture") {
     elements.furnitureRoomEdit.replaceChildren(...activePlan.plan.rooms.map((candidate) => new Option(candidate.name, candidate.id, false, candidate.id === item.roomId)));

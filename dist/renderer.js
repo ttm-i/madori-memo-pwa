@@ -1,4 +1,4 @@
-import { analyzeFurnitureConflicts, analyzeFurniturePlacement, getDimensionGroup, moveDimensionGuide, QUALITY_LABELS, snapToGrid } from "./model.js";
+import { analyzeFurnitureConflicts, analyzeFurniturePlacement, getDimensionGroup, getElectricalPlanPosition, moveDimensionGuide, QUALITY_LABELS, snapToGrid } from "./model.js";
 
 const NS = "http://www.w3.org/2000/svg";
 
@@ -40,7 +40,7 @@ export class PlanRenderer {
     this.draggingDimension = null;
     this.selectedFurnitureId = null;
     this.dimensionGroups = null;
-    this.selectableTypes = new Set(["room", "dimension", "equipment", "furniture"]);
+    this.selectableTypes = new Set(["room", "dimension", "equipment", "electrical", "furniture"]);
     this.suppressNextClick = false;
     this.bindGestures();
   }
@@ -106,6 +106,39 @@ export class PlanRenderer {
           y: feature.y + feature.height / 2,
         }, feature.shortLabel));
       }
+      content.append(group);
+    }
+
+    const electricalItems = [
+      ...(documentData.plan.electrical?.outlets ?? []).map((item) => ({ ...item, electricalType: "outlet" })),
+      ...(documentData.plan.electrical?.switches ?? []).map((item) => ({ ...item, electricalType: "switch" })),
+    ];
+    for (const electrical of electricalItems) {
+      const position = getElectricalPlanPosition(documentData, electrical);
+      if (!position) continue;
+      const selectable = this.isSelectable("electrical");
+      const group = svg("g", {
+        class: `electrical-marker electrical-${electrical.electricalType} ${selectable ? "" : "not-selectable"}`,
+        tabindex: 0,
+        role: "button",
+        "aria-label": `${electrical.sourceLabel ?? ""} ${electrical.name}`.trim(),
+      });
+      if (position.anchor.x !== position.display.x || position.anchor.y !== position.display.y) {
+        group.append(svg("line", {
+          class: "electrical-leader",
+          x1: position.anchor.x, y1: position.anchor.y,
+          x2: position.display.x, y2: position.display.y,
+        }));
+      }
+      group.append(
+        svg("circle", { class: "electrical-hit", cx: position.display.x, cy: position.display.y, r: 25 }),
+        svg("circle", { class: "electrical-symbol", cx: position.display.x, cy: position.display.y, r: 12 }),
+        svg("text", { class: "electrical-label", x: position.display.x, y: position.display.y + 4 }, electrical.sourceLabel ?? (electrical.electricalType === "outlet" ? "C" : "S")),
+      );
+      group.addEventListener("click", (event) => {
+        event.stopPropagation();
+        if (selectable) this.onSelect(electrical.electricalType, electrical);
+      });
       content.append(group);
     }
 
@@ -391,6 +424,26 @@ export function detailMarkup(type, item) {
     values.push(["頂点", `${item.points.length}点`]);
   } else if (type === "dimension") {
     values.push(["寸法", `${item.label ?? item.valueCm} cm`]);
+  } else if (type === "outlet" || type === "switch") {
+    const referenceLabels = {
+      "left-side-wall": "左側の壁",
+      "right-side-wall": "右側の壁",
+      "wall-right-edge": "壁の右端",
+      "wall-start": "壁の始点",
+      "ldk-right-column": "LDK柱型",
+      "counter-right-edge": "カウンター右端",
+      "washroom-door": "洗面所ドア",
+      "ldk-door": "LDKドア",
+    };
+    if (item.roomName) values.push(["場所", item.roomName]);
+    if (item.sourceLabel) values.push(["図面記号", item.sourceLabel]);
+    values.push(["種類", type === "outlet" ? "コンセント" : "スイッチ"]);
+    if (type === "outlet" && Number.isFinite(item.receptacleCount)) values.push(["口数", `${item.receptacleCount}口`]);
+    const centerHeight = item.verticalPosition?.centerHeightCm ?? item.verticalPosition?.derivedCenterHeightCm;
+    if (Number.isFinite(centerHeight)) values.push(["中心高さ", `床から ${centerHeight} cm`]);
+    if (item.horizontalPosition?.reference) values.push(["水平基準", referenceLabels[item.horizontalPosition.reference] ?? item.horizontalPosition.reference]);
+    if (Number.isFinite(item.horizontalPosition?.offsetCm)) values.push(["基準から", `${item.horizontalPosition.offsetCm} cm`]);
+    values.push(["測定点", "プレート中心"]);
   } else {
     if (Number.isFinite(item.widthCm)) values.push(["幅", `${item.widthCm} cm`]);
     if (Number.isFinite(item.depthCm)) values.push(["奥行", `${item.depthCm} cm`]);

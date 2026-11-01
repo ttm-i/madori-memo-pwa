@@ -98,6 +98,7 @@ button { color: inherit; touch-action: manipulation; }
 .wall-plan-svg { display: block; width: 100%; height: min(34dvh, 260px); background-color: #f3f0e8; background-image: linear-gradient(#e8e4da 1px, transparent 1px), linear-gradient(90deg, #e8e4da 1px, transparent 1px); background-size: 18px 18px; touch-action: manipulation; }
 .wall-plan-room { fill: #f8e9bf; stroke: none; }
 .wall-plan-opening { stroke: #4f8c9f; stroke-width: 7; stroke-linecap: round; vector-effect: non-scaling-stroke; pointer-events: none; }
+.wall-plan-electrical { fill: #fff; stroke: #be6a3c; stroke-width: 4; vector-effect: non-scaling-stroke; pointer-events: none; }
 .wall-plan-wall { cursor: pointer; outline: none; }
 .wall-plan-wall-line { stroke: #4b504c; stroke-width: 5; stroke-linecap: square; vector-effect: non-scaling-stroke; }
 .wall-plan-wall-hit { stroke: transparent; stroke-width: 26; vector-effect: non-scaling-stroke; }
@@ -227,6 +228,14 @@ dialog::backdrop { background: rgba(32,36,31,.42); backdrop-filter: blur(2px); }
 .feature-shape { fill: #b8c9c1; stroke: #356859; stroke-width: 3; vector-effect: non-scaling-stroke; cursor: pointer; }
 .feature-shape.uncertain { fill: url(#uncertainPattern); stroke: var(--warning); stroke-dasharray: 7 5; }
 .feature-label { fill: #4a3627; font-size: 9px; font-weight: 750; text-anchor: middle; dominant-baseline: middle; pointer-events: none; paint-order: stroke; stroke: var(--surface); stroke-width: 3px; }
+.electrical-marker { cursor: pointer; }
+.electrical-hit { fill: transparent; }
+.electrical-leader { stroke: #8b6d59; stroke-width: 1.5; vector-effect: non-scaling-stroke; pointer-events: none; }
+.electrical-symbol { fill: #fff8ee; stroke: #ba6b36; stroke-width: 2.5; vector-effect: non-scaling-stroke; }
+.electrical-switch .electrical-symbol { fill: #eef7f4; stroke: #3f7668; }
+.electrical-label { fill: #78451f; font-size: 10px; font-weight: 850; text-anchor: middle; pointer-events: none; paint-order: stroke; stroke: #fff; stroke-width: 2px; }
+.electrical-switch .electrical-label { fill: #315e53; }
+.electrical-marker:hover .electrical-symbol, .electrical-marker:focus .electrical-symbol { stroke-width: 4; }
 .wall-line { fill: none; stroke: #303531; stroke-linecap: square; vector-effect: non-scaling-stroke; }
 .wall-line.uncertain { stroke: var(--warning); stroke-dasharray: 7 5; }
 .furniture-group { cursor: pointer; }

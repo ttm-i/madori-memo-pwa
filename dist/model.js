@@ -55,6 +55,8 @@ export function countQualities(plan) {
     ...(plan.plan.features ?? []),
     ...(plan.plan.openings ?? []),
     ...(plan.plan.walls ?? []),
+    ...(plan.plan.electrical?.outlets ?? []),
+    ...(plan.plan.electrical?.switches ?? []),
   ];
   return {
     measured: items.filter((item) => item.quality === "measured").length,
@@ -177,6 +179,31 @@ export function buildRoomWalls(documentData, roomId) {
   if (!Array.isArray(order)) return combined;
   const rank = new Map(order.map((id, index) => [id, index]));
   return combined.sort((first, second) => (rank.get(first.id) ?? Number.MAX_SAFE_INTEGER) - (rank.get(second.id) ?? Number.MAX_SAFE_INTEGER));
+}
+
+export function getElectricalPlanPosition(documentData, electrical) {
+  if (!electrical) return null;
+  const point = electrical.planPoint;
+  let anchor = point && [point.x, point.y].every(Number.isFinite) ? { ...point } : null;
+  if (!anchor && electrical.roomId && electrical.elevationWallId && Number.isFinite(electrical.elevationCenterCm)) {
+    const wall = buildRoomWalls(documentData, electrical.roomId).find((item) => item.id === electrical.elevationWallId);
+    if (wall?.lengthCm > 0) {
+      const ratio = Math.min(1, Math.max(0, electrical.elevationCenterCm / wall.lengthCm));
+      anchor = {
+        x: wall.from.x + (wall.to.x - wall.from.x) * ratio,
+        y: wall.from.y + (wall.to.y - wall.from.y) * ratio,
+      };
+    }
+  }
+  if (!anchor) return null;
+  const offset = electrical.planDisplayOffset ?? {};
+  return {
+    anchor,
+    display: {
+      x: anchor.x + (Number.isFinite(offset.x) ? offset.x : 0),
+      y: anchor.y + (Number.isFinite(offset.y) ? offset.y : 0),
+    },
+  };
 }
 
 export function buildWallDiagram(documentData, roomId, wallId) {
@@ -396,6 +423,16 @@ export function createSamplePlan() {
         { id: "sample-closet", name: "収納（仮）", kind: "closet", roomId: "sample-ldk", elevationWallId: "sample-ldk-wall-0", elevationOffsetCm: 360, elevationWidthCm: 140, x:420, y:80, width:140, height:70, derivedInteriorHeightCm: 220, shelfUndersideHeightCm: 165, quality: "approximate", uncertain: true },
       ],
       walls: [],
+      electrical: {
+        measurementPoint: "plate-center",
+        outlets: [
+          { id: "sample-outlet", sourceLabel: "①", roomId: "sample-ldk", name: "サンプルコンセント", receptacleCount: 2, mountingSurface: "wall", elevationWallId: "sample-ldk-wall-1", elevationCenterCm: 90, elevationWidthCm: 8, planDisplayOffset: { x: -16, y: 0 }, horizontalPosition: { reference: "wall-start", offsetCm: 90 }, verticalPosition: { reference: "floor", centerHeightCm: 25 }, quality: "measured" },
+        ],
+        switches: [
+          { id: "sample-switch", sourceLabel: "A", roomId: "sample-ldk", name: "サンプルスイッチ", mountingSurface: "wall", elevationWallId: "sample-ldk-wall-1", elevationCenterCm: 130, elevationWidthCm: 8, planDisplayOffset: { x: -16, y: 0 }, horizontalPosition: { reference: "wall-start", offsetCm: 130 }, verticalPosition: { reference: "floor", centerHeightCm: 120 }, quality: "measured" },
+        ],
+        omittedFromDrawing: [],
+      },
       furniture: [],
       dimensions: [
         { id: "sample-d1", label: "500", valueCm: 500, from: {x:60,y:35}, to: {x:560,y:35}, offset: 0, quality: "measured" },
