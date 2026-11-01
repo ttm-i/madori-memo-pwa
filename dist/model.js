@@ -205,6 +205,11 @@ export function buildWallDiagram(documentData, roomId, wallId) {
   return { ...wall, items };
 }
 
+export function wallDisplayWidth(lengthCm, referenceLengthCm, maximumWidth = 840) {
+  if (![lengthCm, referenceLengthCm, maximumWidth].every(Number.isFinite) || lengthCm < 0 || referenceLengthCm <= 0 || maximumWidth <= 0) return 0;
+  return lengthCm / referenceLengthCm * maximumWidth;
+}
+
 export function rotateFurniture(furniture) {
   const centerX = furniture.x + furniture.widthCm / 2;
   const centerY = furniture.y + furniture.depthCm / 2;

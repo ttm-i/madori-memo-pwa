@@ -1,5 +1,5 @@
 import { deleteActivePlan, loadActivePlan, saveActivePlan } from "./db.js";
-import { analyzeFurnitureConflicts, analyzeFurniturePlacement, buildElevationItems, buildRoomWalls, buildWallDiagram, countQualities, createSamplePlan, DIMENSION_GROUP_LABELS, duplicateFurniture, getDimensionGroup, rotateFurniture, updateFurniture, validatePlan } from "./model.js";
+import { analyzeFurnitureConflicts, analyzeFurniturePlacement, buildElevationItems, buildRoomWalls, buildWallDiagram, countQualities, createSamplePlan, DIMENSION_GROUP_LABELS, duplicateFurniture, getDimensionGroup, rotateFurniture, updateFurniture, validatePlan, wallDisplayWidth } from "./model.js";
 import { detailMarkup, PlanRenderer } from "./renderer.js";
 
 const elements = Object.fromEntries([
@@ -16,7 +16,7 @@ const elements = Object.fromEntries([
   "editFurnitureButton", "furnitureDialogTitle", "furnitureSubmitButton",
   "furnitureListButton", "furnitureListDialog", "furnitureList", "furnitureListCount",
   "wallDiagramModeButton", "wallHeightModeButton", "wallRoomList", "wallEmpty",
-  "wallDiagramPanel", "wallList", "wallDiagramTitle", "wallDiagramMeta", "wallDiagramSvg", "wallDiagramDetails",
+  "wallDiagramPanel", "wallPlanTitle", "wallPlanSvg", "wallList", "wallDiagramTitle", "wallDiagramMeta", "wallDiagramSvg", "wallDiagramDetails",
   "wallHeightPanel", "wallCanvas", "wallScale", "wallTrack", "wallLegend", "wallCeilingNote",
 ].map((id) => [id, document.getElementById(id)]));
 
@@ -101,7 +101,62 @@ function wallSvg(tag, attributes = {}, text = "") {
   return element;
 }
 
-function renderWallDiagram(diagram) {
+function renderWallPlan(room, walls) {
+  elements.wallPlanSvg.replaceChildren();
+  if (!room || !walls.length) return;
+  const padding = 38;
+  const xs = room.points.map((point) => point.x);
+  const ys = room.points.map((point) => point.y);
+  const minX = Math.min(...xs);
+  const maxX = Math.max(...xs);
+  const minY = Math.min(...ys);
+  const maxY = Math.max(...ys);
+  elements.wallPlanSvg.setAttribute("viewBox", `${minX - padding} ${minY - padding} ${maxX - minX + padding * 2} ${maxY - minY + padding * 2}`);
+  elements.wallPlanTitle.textContent = `${room.name}の間取り図`;
+  elements.wallPlanSvg.append(wallSvg("polygon", {
+    class: "wall-plan-room",
+    points: room.points.map((point) => `${point.x},${point.y}`).join(" "),
+  }));
+  for (const opening of activePlan.plan.openings ?? []) {
+    const belongs = opening.roomId === room.id || opening.roomIds?.includes(room.id);
+    if (!belongs || !opening.from || !opening.to) continue;
+    elements.wallPlanSvg.append(wallSvg("line", {
+      class: "wall-plan-opening",
+      x1: opening.from.x, y1: opening.from.y, x2: opening.to.x, y2: opening.to.y,
+    }));
+  }
+  walls.forEach((wall, index) => {
+    const selected = wall.id === selectedWallId;
+    const group = wallSvg("g", {
+      class: `wall-plan-wall ${selected ? "is-selected" : ""}`,
+      role: "button",
+      tabindex: 0,
+      "aria-label": `壁${index + 1} ${wall.label} ${Math.round(wall.lengthCm * 10) / 10} cm`,
+    });
+    const attributes = { x1: wall.from.x, y1: wall.from.y, x2: wall.to.x, y2: wall.to.y };
+    group.append(
+      wallSvg("line", { class: "wall-plan-wall-line", ...attributes }),
+      wallSvg("line", { class: "wall-plan-wall-hit", ...attributes }),
+    );
+    const midX = (wall.from.x + wall.to.x) / 2;
+    const midY = (wall.from.y + wall.to.y) / 2;
+    group.append(
+      wallSvg("circle", { class: "wall-plan-wall-number-bg", cx: midX, cy: midY, r: 13 }),
+      wallSvg("text", { class: "wall-plan-wall-number", x: midX, y: midY + 5, "text-anchor": "middle" }, index + 1),
+    );
+    const select = () => updateWallView(selectedWallRoomId, wall.id);
+    group.addEventListener("click", select);
+    group.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        select();
+      }
+    });
+    elements.wallPlanSvg.append(group);
+  });
+}
+
+function renderWallDiagram(diagram, referenceLengthCm = diagram?.lengthCm) {
   elements.wallDiagramSvg.replaceChildren();
   elements.wallDiagramDetails.replaceChildren();
   if (!diagram) {
@@ -110,11 +165,12 @@ function renderWallDiagram(diagram) {
     return;
   }
   elements.wallDiagramTitle.textContent = diagram.label;
-  elements.wallDiagramMeta.textContent = `幅 ${Math.round(diagram.lengthCm * 10) / 10} cm`;
+  elements.wallDiagramMeta.textContent = `幅 ${Math.round(diagram.lengthCm * 10) / 10} cm・部屋内共通縮尺`;
   const highest = Math.max(200, ...diagram.items.map((item) => item.topCm));
   const displayMaxCm = Math.max(225, Math.ceil((highest + 20) / 25) * 25);
-  const left = 70;
-  const right = 950;
+  const left = 80;
+  const maxDrawWidth = 840;
+  const right = left + wallDisplayWidth(diagram.lengthCm, referenceLengthCm, maxDrawWidth);
   const top = 72;
   const floor = 500;
   const drawWidth = right - left;
@@ -136,7 +192,7 @@ function renderWallDiagram(diagram) {
     wallSvg("line", { class: "wall-svg-side", x1: left, y1: top, x2: left, y2: floor }),
     wallSvg("line", { class: "wall-svg-side", x1: right, y1: top, x2: right, y2: floor }),
     wallSvg("line", { class: "wall-svg-floor", x1: left, y1: floor, x2: right, y2: floor }),
-    wallSvg("text", { class: "wall-svg-limit-text", x: right, y: top - 13, "text-anchor": "end" }, `${displayMaxCm} cm（表示上限）`),
+    wallSvg("text", { class: "wall-svg-limit-text", x: Math.max(right, left + 160), y: top - 13, "text-anchor": "end" }, `${displayMaxCm} cm（表示上限）`),
     wallSvg("line", { class: "wall-svg-width-line", x1: left, y1: 36, x2: right, y2: 36 }),
     wallSvg("text", { class: "wall-svg-width-text", x: (left + right) / 2, y: 28, "text-anchor": "middle" }, `壁幅 ${Math.round(diagram.lengthCm * 10) / 10} cm`),
   );
@@ -261,6 +317,7 @@ function updateWallView(preferredRoomId = selectedWallRoomId, preferredWallId = 
   if (!hasData) {
     elements.wallRoomList.replaceChildren();
     elements.wallList.replaceChildren();
+    elements.wallPlanSvg.replaceChildren();
     renderWallDiagram(null);
     renderHeightComparison([]);
     return;
@@ -271,14 +328,14 @@ function updateWallView(preferredRoomId = selectedWallRoomId, preferredWallId = 
   selectedWallId = walls.some((wall) => wall.id === preferredWallId)
     ? preferredWallId
     : diagrams.sort((first, second) => second.items.length - first.items.length)[0]?.id ?? walls[0]?.id ?? null;
-  const wallButtons = walls.map((wall) => {
+  const wallButtons = walls.map((wall, index) => {
     const diagram = buildWallDiagram(activePlan, selectedWallRoomId, wall.id);
     const button = document.createElement("button");
     button.type = "button";
     button.className = `wall-list-button ${wall.id === selectedWallId ? "is-active" : ""}`;
     button.setAttribute("aria-pressed", String(wall.id === selectedWallId));
     const name = document.createElement("strong");
-    name.textContent = wall.label;
+    name.textContent = `壁${index + 1}・${wall.label}`;
     const meta = document.createElement("span");
     meta.textContent = `${Math.round(wall.lengthCm * 10) / 10} cm${diagram.items.length ? `・${diagram.items.length}要素` : ""}`;
     button.append(name, meta);
@@ -286,7 +343,9 @@ function updateWallView(preferredRoomId = selectedWallRoomId, preferredWallId = 
     return button;
   });
   elements.wallList.replaceChildren(...wallButtons);
-  renderWallDiagram(buildWallDiagram(activePlan, selectedWallRoomId, selectedWallId));
+  const selectedRoom = rooms.find((room) => room.id === selectedWallRoomId);
+  renderWallPlan(selectedRoom, walls);
+  renderWallDiagram(buildWallDiagram(activePlan, selectedWallRoomId, selectedWallId), Math.max(...walls.map((wall) => wall.lengthCm)));
   renderHeightComparison(buildElevationItems(activePlan, selectedWallRoomId));
 }
 

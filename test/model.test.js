@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { analyzeFurnitureConflicts, analyzeFurniturePlacement, buildElevationItems, buildRoomWalls, buildWallDiagram, countQualities, createSamplePlan, duplicateFurniture, FORMAT, getDimensionGroup, moveDimensionGuide, pointInPolygon, rectanglesOverlap, rotateFurniture, snapToGrid, updateFurniture, validatePlan } from "../dist/model.js";
+import { analyzeFurnitureConflicts, analyzeFurniturePlacement, buildElevationItems, buildRoomWalls, buildWallDiagram, countQualities, createSamplePlan, duplicateFurniture, FORMAT, getDimensionGroup, moveDimensionGuide, pointInPolygon, rectanglesOverlap, rotateFurniture, snapToGrid, updateFurniture, validatePlan, wallDisplayWidth } from "../dist/model.js";
 import { zoomTransformAround } from "../dist/renderer.js";
 
 test("sample plan conforms to the public schema", () => {
@@ -52,6 +52,12 @@ test("room walls retain plan direction and place openings at measured horizontal
   assert.deepEqual(bottom.items.map(({ name, offsetCm, widthCm, topCm }) => ({ name, offsetCm, widthCm, topCm })), [
     { name: "掃き出し窓", offsetCm: 40, widthCm: 170, topCm: 180 },
   ]);
+});
+
+test("wall elevations use a common room scale instead of stretching every wall", () => {
+  assert.equal(wallDisplayWidth(500, 500), 840);
+  assert.equal(wallDisplayWidth(280, 500), 470.40000000000003);
+  assert.equal(wallDisplayWidth(90, 500), 151.2);
 });
 
 test("furniture rotates around its center", () => {

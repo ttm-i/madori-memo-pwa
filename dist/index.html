@@ -116,6 +116,14 @@
             <span>間取りJSONを読み込むと表示されます。</span>
           </div>
           <div id="wallDiagramPanel" class="wall-diagram-panel" hidden>
+            <section class="wall-plan-card" aria-labelledby="wallPlanTitle">
+              <div class="wall-plan-heading">
+                <div><p class="eyebrow">WALL SELECTOR</p><h3 id="wallPlanTitle">部屋の間取り図</h3></div>
+                <span>壁をタッチして選択</span>
+              </div>
+              <svg id="wallPlanSvg" class="wall-plan-svg" role="img" aria-label="選択中の部屋と壁"></svg>
+              <p class="wall-plan-note">緑色の太線が、下の立面図に表示されている壁です。室内から壁を見た向きで左から右へ描画します。</p>
+            </section>
             <div id="wallList" class="wall-list" aria-label="表示する壁"></div>
             <section class="wall-diagram-card" aria-labelledby="wallDiagramTitle">
               <div class="wall-diagram-heading">

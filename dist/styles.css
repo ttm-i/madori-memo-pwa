@@ -91,6 +91,23 @@ button { color: inherit; touch-action: manipulation; }
 .wall-empty strong { color: var(--ink); }
 .wall-empty span { font-size: .76rem; }
 .wall-diagram-panel { display: grid; gap: 10px; }
+.wall-plan-card { overflow: hidden; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); }
+.wall-plan-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 14px 7px; }
+.wall-plan-heading h3 { margin: 2px 0 0; font-size: .9rem; }
+.wall-plan-heading > span { color: var(--accent); font-size: .65rem; font-weight: 750; }
+.wall-plan-svg { display: block; width: 100%; height: min(34dvh, 260px); background-color: #f3f0e8; background-image: linear-gradient(#e8e4da 1px, transparent 1px), linear-gradient(90deg, #e8e4da 1px, transparent 1px); background-size: 18px 18px; touch-action: manipulation; }
+.wall-plan-room { fill: #f8e9bf; stroke: none; }
+.wall-plan-opening { stroke: #4f8c9f; stroke-width: 7; stroke-linecap: round; vector-effect: non-scaling-stroke; pointer-events: none; }
+.wall-plan-wall { cursor: pointer; outline: none; }
+.wall-plan-wall-line { stroke: #4b504c; stroke-width: 5; stroke-linecap: square; vector-effect: non-scaling-stroke; }
+.wall-plan-wall-hit { stroke: transparent; stroke-width: 26; vector-effect: non-scaling-stroke; }
+.wall-plan-wall.is-selected .wall-plan-wall-line { stroke: var(--accent); stroke-width: 12; stroke-linecap: round; }
+.wall-plan-wall:focus .wall-plan-wall-line { stroke: var(--accent); }
+.wall-plan-wall-number-bg { fill: var(--surface); stroke: #4b504c; stroke-width: 2; vector-effect: non-scaling-stroke; }
+.wall-plan-wall.is-selected .wall-plan-wall-number-bg { fill: var(--accent); stroke: var(--surface); }
+.wall-plan-wall-number { fill: var(--ink); font-size: 13px; font-weight: 800; pointer-events: none; }
+.wall-plan-wall.is-selected .wall-plan-wall-number { fill: white; }
+.wall-plan-note { margin: 0; padding: 8px 12px 10px; color: var(--muted); font-size: .62rem; line-height: 1.5; }
 .wall-list { display: flex; gap: 7px; overflow-x: auto; padding: 0 2px 2px; scrollbar-width: none; }
 .wall-list::-webkit-scrollbar { display: none; }
 .wall-list-button { display: grid; flex: 0 0 auto; gap: 1px; min-width: 105px; min-height: 48px; padding: 7px 11px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: var(--muted); text-align: left; }
