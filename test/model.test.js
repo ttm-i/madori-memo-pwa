@@ -60,6 +60,27 @@ test("wall elevations use a common room scale instead of stretching every wall",
   assert.equal(wallDisplayWidth(90, 500), 151.2);
 });
 
+test("custom elevations can replace a room edge and omit a non-wall opening", () => {
+  const sample = createSamplePlan();
+  const room = sample.plan.rooms.find((item) => item.id === "sample-room");
+  room.nonWallEdges = [1];
+  sample.plan.hiddenElevationWallIds = ["sample-room-wall-2"];
+  sample.plan.elevationWalls = [{
+    id: "sample-custom-wall",
+    roomId: "sample-room",
+    label: "折れ壁",
+    from: { x: 500, y: 280 },
+    to: { x: 382.5, y: 280 },
+    lengthCm: 117.5,
+  }];
+  sample.plan.elevationWallOrderByRoom = { "sample-room": ["sample-custom-wall", "sample-room-wall-0"] };
+  assert.deepEqual(buildRoomWalls(sample, "sample-room").map((wall) => wall.id), [
+    "sample-custom-wall",
+    "sample-room-wall-0",
+    "sample-room-wall-3",
+  ]);
+});
+
 test("furniture rotates around its center", () => {
   const furniture = { id: "f1", name: "テーブル", x: 100, y: 200, widthCm: 140, depthCm: 80 };
   rotateFurniture(furniture);

@@ -213,7 +213,9 @@ dialog::backdrop { background: rgba(32,36,31,.42); backdrop-filter: blur(2px); }
 .toast { position: fixed; left: 50%; bottom: calc(22px + env(safe-area-inset-bottom)); z-index: 20; max-width: calc(100% - 32px); padding: 11px 16px; border-radius: 99px; background: #272c28; color: white; font-size: .78rem; opacity: 0; transform: translate(-50%, 12px); pointer-events: none; transition: .22s ease; }
 .toast.visible { opacity: 1; transform: translate(-50%, 0); }
 
-.room-shape { stroke: #393d38; stroke-width: 7; vector-effect: non-scaling-stroke; }
+.room-shape { stroke: none; }
+.room-boundary { stroke: #393d38; stroke-width: 7; vector-effect: non-scaling-stroke; pointer-events: none; }
+.room-boundary.uncertain { stroke: #393d38; }
 .room-label { fill: #29302c; font-size: 22px; font-weight: 750; text-anchor: middle; pointer-events: none; }
 .room-area { fill: #6e746d; font-size: 15px; text-anchor: middle; pointer-events: none; }
 .opening-line { stroke: #4f786c; stroke-width: 8; stroke-linecap: round; vector-effect: non-scaling-stroke; cursor: pointer; }

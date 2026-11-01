@@ -144,7 +144,7 @@ export function buildRoomWalls(documentData, roomId) {
   const ys = room.points.map((point) => point.y);
   const bounds = { left: Math.min(...xs), right: Math.max(...xs), top: Math.min(...ys), bottom: Math.max(...ys) };
   const same = (first, second) => Math.abs(first - second) < 0.01;
-  const walls = room.points.map((from, index) => {
+  const automaticWalls = room.points.map((from, index) => {
     const to = room.points[(index + 1) % room.points.length];
     const horizontal = Math.abs(to.x - from.x) >= Math.abs(to.y - from.y);
     const lengthCm = Math.hypot(to.x - from.x, to.y - from.y);
@@ -154,14 +154,29 @@ export function buildRoomWalls(documentData, roomId) {
     else if (!horizontal && same(from.x, bounds.left)) baseLabel = "左側の壁";
     else if (!horizontal && same(from.x, bounds.right)) baseLabel = "右側の壁";
     return { id: `${roomId}-wall-${index}`, roomId, index, from, to, lengthCm, horizontal, baseLabel };
-  }).filter((wall) => wall.lengthCm >= 5);
-  const totals = walls.reduce((counts, wall) => counts.set(wall.baseLabel, (counts.get(wall.baseLabel) ?? 0) + 1), new Map());
+  }).filter((wall) => wall.lengthCm >= 5 && !room.nonWallEdges?.includes(wall.index));
+  const totals = automaticWalls.reduce((counts, wall) => counts.set(wall.baseLabel, (counts.get(wall.baseLabel) ?? 0) + 1), new Map());
   const seen = new Map();
-  return walls.map((wall) => {
+  const namedAutomaticWalls = automaticWalls.map((wall) => {
     const sequence = (seen.get(wall.baseLabel) ?? 0) + 1;
     seen.set(wall.baseLabel, sequence);
     return { ...wall, label: totals.get(wall.baseLabel) > 1 ? `${wall.baseLabel} ${sequence}` : wall.baseLabel };
   });
+  const hidden = new Set(documentData.plan.hiddenElevationWallIds ?? []);
+  const customWalls = (documentData.plan.elevationWalls ?? [])
+    .filter((wall) => wall.roomId === roomId)
+    .map((wall, index) => ({
+      ...wall,
+      index: room.points.length + index,
+      lengthCm: wall.lengthCm ?? Math.hypot(wall.to.x - wall.from.x, wall.to.y - wall.from.y),
+      horizontal: Math.abs(wall.to.x - wall.from.x) >= Math.abs(wall.to.y - wall.from.y),
+      baseLabel: wall.label,
+    }));
+  const combined = [...namedAutomaticWalls.filter((wall) => !hidden.has(wall.id)), ...customWalls];
+  const order = documentData.plan.elevationWallOrderByRoom?.[roomId];
+  if (!Array.isArray(order)) return combined;
+  const rank = new Map(order.map((id, index) => [id, index]));
+  return combined.sort((first, second) => (rank.get(first.id) ?? Number.MAX_SAFE_INTEGER) - (rank.get(second.id) ?? Number.MAX_SAFE_INTEGER));
 }
 
 export function buildWallDiagram(documentData, roomId, wallId) {
@@ -201,6 +216,20 @@ export function buildWallDiagram(documentData, roomId, wallId) {
         widthCm: feature.elevationWidthCm ?? feature.internalWidthCm ?? feature.overallWidthCm ?? feature.width ?? 20,
       });
     }
+  }
+  const electricalItems = [
+    ...(documentData.plan.electrical?.outlets ?? []),
+    ...(documentData.plan.electrical?.switches ?? []),
+  ];
+  for (const electrical of electricalItems) {
+    if (electrical.elevationWallId !== wall.id) continue;
+    const related = verticalItems.find((item) => item.id === electrical.id);
+    if (!related) continue;
+    const widthCm = electrical.elevationWidthCm ?? 8;
+    const offsetCm = electrical.elevationCenterCm != null
+      ? electrical.elevationCenterCm - widthCm / 2
+      : electrical.elevationOffsetCm ?? 0;
+    items.push({ ...related, offsetCm, widthCm });
   }
   return { ...wall, items };
 }

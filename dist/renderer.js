@@ -62,6 +62,14 @@ export class PlanRenderer {
       const polygon = svg("polygon", { class: `room-shape ${room.uncertain ? "uncertain" : ""}`, points: pointsValue(room.points), fill: room.color ?? "#eee8d9" });
       polygon.addEventListener("click", () => { if (this.isSelectable("room")) this.onSelect("room", room); });
       group.append(polygon);
+      room.points.forEach((from, index) => {
+        if (room.nonWallEdges?.includes(index)) return;
+        const to = room.points[(index + 1) % room.points.length];
+        group.append(svg("line", {
+          class: `room-boundary ${room.uncertain ? "uncertain" : ""}`,
+          x1: from.x, y1: from.y, x2: to.x, y2: to.y,
+        }));
+      });
       if (room.label) {
         group.append(svg("text", { class: "room-label", x: room.label.x, y: room.label.y }, room.name));
         if (room.areaLabel) group.append(svg("text", { class: "room-area", x: room.label.x, y: room.label.y + 24 }, room.areaLabel));
