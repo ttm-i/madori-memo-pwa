@@ -121,6 +121,8 @@ function updateDimensionFilters() {
 
 async function setActivePlan(plan, { persist = true } = {}) {
   activePlan = plan;
+  history.length = 0;
+  updateUndoButton();
   renderer.render(plan);
   updateSummary();
   updateDimensionFilters();
