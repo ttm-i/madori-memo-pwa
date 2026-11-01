@@ -924,8 +924,7 @@ updateUndoButton();
 loadActivePlan().then((plan) => {
   if (!plan) return updateSummary();
   const validated = validatePlan(plan);
-  const legacySample = validated.meta.private === false
-    && validated.meta.title === "架空サンプル住戸"
+  const legacySample = validated.meta.title === "架空サンプル住戸"
     && (!validated.plan.features.some((feature) => feature.kind === "kitchen")
       || !validated.plan.accessRoute
       || buildElevationItems(validated, "sample-room").length === 0);
