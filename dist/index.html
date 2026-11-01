@@ -10,7 +10,7 @@
     <meta name="description" content="間取りと家具寸法を端末内だけで確認するオフラインPWA" />
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" href="./icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="./styles.css?v=33" />
+    <link rel="stylesheet" href="./styles.css?v=34" />
     <title>間取りメモ</title>
   </head>
   <body>
@@ -185,7 +185,10 @@
             <span>対応するJSONを読み込むと表示されます。</span>
           </div>
           <div id="deliveryContent" hidden>
+            <div class="delivery-section-heading delivery-route-heading"><h3>建物から玄関まで</h3><span>共用部・玄関</span></div>
             <div id="deliveryRouteGrid" class="delivery-route-grid"></div>
+            <div class="delivery-section-heading delivery-route-heading"><h3>室内の開口</h3><span>設置先に応じて判定</span></div>
+            <div id="deliveryDoorGrid" class="delivery-route-grid"></div>
             <section class="delivery-furniture-section" aria-labelledby="deliveryFurnitureTitle">
               <div class="delivery-section-heading">
                 <h3 id="deliveryFurnitureTitle">家具ごとの確認</h3>
@@ -300,7 +303,7 @@
       <input id="fileInput" type="file" accept="application/json,.json" hidden />
       <div id="toast" class="toast" role="status" aria-live="polite"></div>
     </div>
-    <script type="module" src="./app.js?v=33"></script>
+    <script type="module" src="./app.js?v=34"></script>
   </body>
 </html>
 

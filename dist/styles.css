@@ -204,6 +204,8 @@ button { color: inherit; touch-action: manipulation; }
 .delivery-section-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
 .delivery-section-heading h3 { margin: 0; font-size: .92rem; }
 .delivery-section-heading span { color: var(--muted); font-size: .62rem; }
+.delivery-route-heading { margin: 14px 3px 7px; }
+.delivery-route-heading:first-child { margin-top: 0; }
 .delivery-furniture-list { display: grid; gap: 9px; }
 .delivery-furniture-card { display: grid; gap: 8px; padding: 12px; border: 1px solid var(--line); border-radius: 14px; background: #fbfaf6; }
 .delivery-furniture-card-header { display: flex; align-items: center; justify-content: space-between; gap: 10px; }

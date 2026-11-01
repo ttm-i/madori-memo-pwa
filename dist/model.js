@@ -309,6 +309,28 @@ export function fitsRectangle(sides, widthCm, heightCm) {
   return false;
 }
 
+export function findDeliveryDoorPath(documentData, destinationRoomId) {
+  const route = documentData?.plan?.accessRoute;
+  const startRoomId = route?.entryRoomId ?? "hall";
+  if (!destinationRoomId || destinationRoomId === startRoomId) return [];
+  const doors = (documentData?.plan?.openings ?? []).filter((opening) => String(opening.kind ?? "").includes("door") && opening.roomIds?.length === 2);
+  const queue = [{ roomId: startRoomId, path: [] }];
+  const visited = new Set([startRoomId]);
+  while (queue.length) {
+    const current = queue.shift();
+    for (const door of doors) {
+      if (!door.roomIds.includes(current.roomId)) continue;
+      const nextRoomId = door.roomIds.find((roomId) => roomId !== current.roomId);
+      if (!nextRoomId || visited.has(nextRoomId)) continue;
+      const path = [...current.path, door];
+      if (nextRoomId === destinationRoomId) return path;
+      visited.add(nextRoomId);
+      queue.push({ roomId: nextRoomId, path });
+    }
+  }
+  return null;
+}
+
 export function analyzeDeliveryRoute(furniture, documentData) {
   const route = documentData?.plan?.accessRoute;
   const dimensions = furniture?.deliveryDimensions;
@@ -331,6 +353,16 @@ export function analyzeDeliveryRoute(furniture, documentData) {
   const entranceHeight = route.dwellingEntrance?.openingHeightCm ?? entranceOpening?.heightCm;
   addCheck("entrance", "住戸玄関", fitsRectangle(sides, entranceWidth, entranceHeight),
     Number.isFinite(entranceWidth) && Number.isFinite(entranceHeight) ? `${entranceWidth} × ${entranceHeight} cm` : "寸法未登録");
+  const doorPath = findDeliveryDoorPath(documentData, furniture.roomId);
+  if (doorPath == null) {
+    addCheck("internal-route", "室内経路", null, "玄関・廊下から設置先までのドア経路を特定できません");
+  } else {
+    for (const door of doorPath) {
+      const clearWidth = door.clearOpeningWidthCm ?? door.widthCm;
+      addCheck(`internal-${door.id}`, door.name, fitsRectangle(sides, clearWidth, door.heightCm),
+        Number.isFinite(clearWidth) && Number.isFinite(door.heightCm) ? `${clearWidth} × ${door.heightCm} cm（有効幅 × 開口高さ）` : "寸法未登録");
+    }
+  }
   return {
     status: checks.every((check) => check.status === "pass") ? "candidate" : "review",
     sides,
@@ -467,6 +499,7 @@ export function createSamplePlan() {
       ],
       accessRoute: {
         purpose: "delivery-feasibility",
+        entryRoomId: "sample-ldk",
         commonCorridor: { widthCm: 125, quality: "measured" },
         elevator: { openingWidthCm: 85, openingHeightCm: 200, cabinWidthCm: 100, cabinDepthCm: 150, quality: "measured" },
         dwellingEntrance: { openingWidthCm: 90, openingHeightCm: 195, quality: "measured" },
@@ -484,7 +517,7 @@ export function createSamplePlan() {
         omittedFromDrawing: [],
       },
       furniture: [
-        { id:"sample-sofa", name:"サンプルソファ", roomId:"sample-ldk", x:300, y:300, widthCm:180, depthCm:85, deliveryDimensions:{sideACm:80,sideBCm:45,sideCCm:190,basis:"packed"}, quality:"measured" },
+        { id:"sample-sofa", name:"サンプルソファ", roomId:"sample-room", x:250, y:630, widthCm:180, depthCm:85, deliveryDimensions:{sideACm:80,sideBCm:45,sideCCm:190,basis:"packed"}, quality:"measured" },
       ],
       dimensions: [
         { id: "sample-d1", label: "500", valueCm: 500, from: {x:60,y:35}, to: {x:560,y:35}, offset: 0, quality: "measured" },

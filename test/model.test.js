@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { analyzeDeliveryRoute, analyzeFurnitureConflicts, analyzeFurniturePlacement, buildElevationItems, buildRoomWalls, buildWallDiagram, countQualities, createSamplePlan, duplicateFurniture, fitsRectangle, FORMAT, getDimensionGroup, getElectricalPlanPosition, moveDimensionGuide, pointInPolygon, rectanglesOverlap, rotateFurniture, snapToGrid, updateFurniture, validatePlan, wallDisplayWidth } from "../dist/model.js";
+import { analyzeDeliveryRoute, analyzeFurnitureConflicts, analyzeFurniturePlacement, buildElevationItems, buildRoomWalls, buildWallDiagram, countQualities, createSamplePlan, duplicateFurniture, findDeliveryDoorPath, fitsRectangle, FORMAT, getDimensionGroup, getElectricalPlanPosition, moveDimensionGuide, pointInPolygon, rectanglesOverlap, rotateFurniture, snapToGrid, updateFurniture, validatePlan, wallDisplayWidth } from "../dist/model.js";
 import { buildKitchenComponentRects, detailMarkup, zoomTransformAround } from "../dist/renderer.js";
 
 test("sample plan conforms to the public schema", () => {
@@ -114,9 +114,11 @@ test("delivery checks consider every orientation without promising access", () =
   assert.equal(fitsRectangle([210, 220, 230], 85, 200), false);
   const sample = createSamplePlan();
   const sofa = sample.plan.furniture[0];
+  assert.deepEqual(findDeliveryDoorPath(sample, "sample-room").map((door) => door.id), ["sample-door"]);
   const candidate = analyzeDeliveryRoute(sofa, sample);
   assert.equal(candidate.status, "candidate");
-  assert.equal(candidate.checks.length, 4);
+  assert.equal(candidate.checks.length, 5);
+  assert(candidate.checks.some((check) => check.id === "internal-sample-door"));
   assert(candidate.checks.every((check) => check.status === "pass"));
   const oversized = { ...sofa, deliveryDimensions: { sideACm: 210, sideBCm: 220, sideCCm: 230, basis: "packed" } };
   assert.equal(analyzeDeliveryRoute(oversized, sample).status, "review");

@@ -1,6 +1,6 @@
-import { deleteActivePlan, loadActivePlan, saveActivePlan } from "./db.js?v=33";
-import { analyzeDeliveryRoute, analyzeFurnitureConflicts, analyzeFurniturePlacement, buildElevationItems, buildRoomWalls, buildWallDiagram, countQualities, createSamplePlan, DIMENSION_GROUP_LABELS, duplicateFurniture, getDimensionGroup, getElectricalPlanPosition, rotateFurniture, updateFurniture, validatePlan, wallDisplayWidth } from "./model.js?v=33";
-import { detailMarkup, PlanRenderer } from "./renderer.js?v=33";
+import { deleteActivePlan, loadActivePlan, saveActivePlan } from "./db.js?v=34";
+import { analyzeDeliveryRoute, analyzeFurnitureConflicts, analyzeFurniturePlacement, buildElevationItems, buildRoomWalls, buildWallDiagram, countQualities, createSamplePlan, DIMENSION_GROUP_LABELS, duplicateFurniture, getDimensionGroup, getElectricalPlanPosition, rotateFurniture, updateFurniture, validatePlan, wallDisplayWidth } from "./model.js?v=34";
+import { detailMarkup, PlanRenderer } from "./renderer.js?v=34";
 
 const elements = Object.fromEntries([
   "menuButton", "dataMenu", "detailDialog", "detailType", "detailTitle", "detailBody", "fileInput",
@@ -21,7 +21,7 @@ const elements = Object.fromEntries([
   "wallDiagramPanel", "wallPlanTitle", "wallPlanSvg", "wallList", "wallDiagramTitle", "wallDiagramMeta", "wallDiagramSvg", "wallDiagramDetails",
   "wallScrollViewButton", "wallOverviewButton", "wallSvgScroll",
   "wallHeightPanel", "wallCanvas", "wallScale", "wallTrack", "wallLegend", "wallCeilingNote",
-  "deliveryEmpty", "deliveryContent", "deliveryRouteGrid", "deliveryFurnitureList", "deliveryLimitations",
+  "deliveryEmpty", "deliveryContent", "deliveryRouteGrid", "deliveryDoorGrid", "deliveryFurnitureList", "deliveryLimitations",
   "deliveryDialog", "deliveryForm", "deliveryDialogTitle", "cancelDeliveryButton", "deliveryBasis",
   "deliverySideA", "deliverySideB", "deliverySideC",
 ].map((id) => [id, document.getElementById(id)]));
@@ -120,12 +120,26 @@ function openDeliveryDialog(furniture) {
   elements.deliveryDialog.showModal();
 }
 
+function makeDeliveryRouteCard(item) {
+  const card = document.createElement("article");
+  card.className = "delivery-route-card";
+  const title = document.createElement("strong");
+  title.textContent = item.title;
+  const value = document.createElement("b");
+  value.textContent = item.value;
+  const note = document.createElement("span");
+  note.textContent = item.note;
+  card.append(title, value, note);
+  return card;
+}
+
 function renderDeliveryView() {
   const route = activePlan?.plan.accessRoute;
   elements.deliveryEmpty.hidden = Boolean(route);
   elements.deliveryContent.hidden = !route;
   if (!route) {
     elements.deliveryRouteGrid.replaceChildren();
+    elements.deliveryDoorGrid.replaceChildren();
     elements.deliveryFurnitureList.replaceChildren();
     elements.deliveryLimitations.replaceChildren();
     return;
@@ -136,19 +150,19 @@ function renderDeliveryView() {
     { title: "エレベーター入口", value: Number.isFinite(route.elevator?.openingWidthCm) && Number.isFinite(route.elevator?.openingHeightCm) ? `${route.elevator.openingWidthCm} × ${route.elevator.openingHeightCm} cm` : "未測定", note: "幅 × 開口高さ" },
     { title: "エレベーター庫内", value: Number.isFinite(route.elevator?.cabinWidthCm) && Number.isFinite(route.elevator?.cabinDepthCm) ? `${route.elevator.cabinWidthCm} × ${route.elevator.cabinDepthCm} cm` : "未測定", note: "床面の幅 × 奥行・高さ未測定" },
     { title: "住戸玄関", value: Number.isFinite(entrance.width) && Number.isFinite(entrance.height) ? `${entrance.width} × ${entrance.height} cm` : "未測定", note: "有効幅 × 開口高さ" },
-  ].map((item) => {
-    const card = document.createElement("article");
-    card.className = "delivery-route-card";
-    const title = document.createElement("strong");
-    title.textContent = item.title;
-    const value = document.createElement("b");
-    value.textContent = item.value;
-    const note = document.createElement("span");
-    note.textContent = item.note;
-    card.append(title, value, note);
-    return card;
-  });
+  ].map(makeDeliveryRouteCard);
   elements.deliveryRouteGrid.replaceChildren(...routeCards);
+  const internalDoors = activePlan.plan.openings
+    .filter((opening) => String(opening.kind ?? "").includes("door") && opening.roomIds?.length === 2)
+    .map((door) => {
+      const width = door.clearOpeningWidthCm ?? door.widthCm;
+      return makeDeliveryRouteCard({
+        title: door.name,
+        value: Number.isFinite(width) && Number.isFinite(door.heightCm) ? `${width} × ${door.heightCm} cm` : "未測定",
+        note: "有効幅 × 開口高さ",
+      });
+    });
+  elements.deliveryDoorGrid.replaceChildren(...internalDoors);
 
   const furniture = activePlan.plan.furniture ?? [];
   if (!furniture.length) {
@@ -941,7 +955,7 @@ if ("serviceWorker" in navigator) {
     reloadingForUpdate = true;
     window.location.reload();
   });
-  window.addEventListener("load", () => navigator.serviceWorker.register("./sw.js?v=33")
+  window.addEventListener("load", () => navigator.serviceWorker.register("./sw.js?v=34")
     .then((registration) => registration.update())
     .catch(() => showToast("オフライン準備に失敗しました")));
 }
