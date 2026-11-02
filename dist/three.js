@@ -33,9 +33,51 @@ export function openingVerticalRange(opening) {
   return { bottomCm, topCm: bottomCm + opening.heightCm, isWindow };
 }
 
-export function renderThreeView(canvas, documentData, quarterTurn = 0, onOpeningSelect = null) {
+function polygonArea(points) {
+  return points.reduce((sum, point, index) => {
+    const next = points[(index + 1) % points.length];
+    return sum + point.x * next.y - next.x * point.y;
+  }, 0) / 2;
+}
+
+export function isCutawayEdge(points, index, quarterTurn = 0) {
+  const from = points[index];
+  const to = points[(index + 1) % points.length];
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const clockwise = polygonArea(points) > 0;
+  const outward = clockwise ? { x: dy, y: -dx } : { x: -dy, y: dx };
+  const nearDirections = [{ x: 1, y: 1 }, { x: 1, y: -1 }, { x: -1, y: -1 }, { x: -1, y: 1 }];
+  const near = nearDirections[((quarterTurn % 4) + 4) % 4];
+  return outward.x * near.x + outward.y * near.y > .001;
+}
+
+function pointToSegmentDistance(point, from, to) {
+  const dx = to.x - from.x; const dy = to.y - from.y;
+  const denominator = dx * dx + dy * dy;
+  const ratio = denominator ? Math.max(0, Math.min(1, ((point.x - from.x) * dx + (point.y - from.y) * dy) / denominator)) : 0;
+  return Math.hypot(point.x - (from.x + dx * ratio), point.y - (from.y + dy * ratio));
+}
+
+function openingIsOnCutawayEdge(opening, rooms, quarterTurn) {
+  const roomIds = opening.roomIds ?? [opening.roomId];
+  const room = rooms.find((candidate) => roomIds.includes(candidate.id));
+  if (!room) return false;
+  const midpoint = { x: (opening.from.x + opening.to.x) / 2, y: (opening.from.y + opening.to.y) / 2 };
+  let closest = { index: -1, distance: Infinity };
+  room.points.forEach((from, index) => {
+    const distance = pointToSegmentDistance(midpoint, from, room.points[(index + 1) % room.points.length]);
+    if (distance < closest.distance) closest = { index, distance };
+  });
+  return closest.index >= 0 && isCutawayEdge(room.points, closest.index, quarterTurn);
+}
+
+export function renderThreeView(canvas, documentData, options = {}, onOpeningSelect = null) {
   canvas.replaceChildren();
   if (!documentData?.plan) return { rendered: false };
+  const quarterTurn = options.quarterTurn ?? 0;
+  const cutaway = options.cutaway !== false;
+  const showLabels = options.showLabels === true;
   const { plan } = documentData;
   const bounds = plan.bounds;
   const drawableOpenings = (plan.openings ?? []).map((opening) => ({ opening, range: openingVerticalRange(opening) })).filter((item) => item.range);
@@ -52,26 +94,31 @@ export function renderThreeView(canvas, documentData, quarterTurn = 0, onOpening
     return { x: 450 + value.x * scale, y: 390 + value.y * scale };
   };
   const floorLayer = svg("g", { class: "three-floor-layer" });
-  const objectLayer = svg("g", { class: "three-object-layer" });
-  const wallLayer = svg("g", { class: "three-wall-layer" });
-  const openingLayer = svg("g", { class: "three-opening-layer" });
+  const sceneLayer = svg("g", { class: "three-scene-layer" });
+  const labelLayer = svg("g", { class: "three-label-layer" });
+  const surfaces = [];
+  let hiddenWallCount = 0;
   for (const room of plan.rooms ?? []) {
     floorLayer.append(svg("polygon", { class: "three-floor", points: pointsValue(room.points.map((point) => project(point))), fill: room.color ?? "#e9e4d8" }));
     const labelPoint = project(room.label ?? room.points[0]);
-    floorLayer.append(svg("text", { class: "three-room-label", x: labelPoint.x, y: labelPoint.y }, room.name));
+    labelLayer.append(svg("text", { class: "three-room-label", x: labelPoint.x, y: labelPoint.y }, room.name));
     room.points.forEach((from, index) => {
       if (room.nonWallEdges?.includes(index)) return;
+      if (cutaway && isCutawayEdge(room.points, index, quarterTurn)) { hiddenWallCount += 1; return; }
       const to = room.points[(index + 1) % room.points.length];
       const bottomA = project(from); const bottomB = project(to);
       const topA = project(from, wallDisplayHeight); const topB = project(to, wallDisplayHeight);
-      wallLayer.append(svg("polygon", { class: "three-wall", points: pointsValue([bottomA, bottomB, topB, topA]) }));
+      surfaces.push({ depth: (bottomA.y + bottomB.y) / 2, order: 0, element: svg("polygon", { class: "three-wall", points: pointsValue([bottomA, bottomB, topB, topA]) }) });
     });
   }
   for (const { opening, range } of drawableOpenings) {
+    if (cutaway && openingIsOnCutawayEdge(opening, plan.rooms ?? [], quarterTurn)) continue;
+    const bottomFrom = project(opening.from, range.bottomCm);
+    const bottomTo = project(opening.to, range.bottomCm);
     const panel = svg("polygon", {
       class: `three-opening three-opening-${range.isWindow ? "window" : "door"}`,
       points: pointsValue([
-        project(opening.from, range.bottomCm), project(opening.to, range.bottomCm),
+        bottomFrom, bottomTo,
         project(opening.to, range.topCm), project(opening.from, range.topCm),
       ]),
       role: "button",
@@ -81,7 +128,7 @@ export function renderThreeView(canvas, documentData, quarterTurn = 0, onOpening
     const select = () => onOpeningSelect?.(opening);
     panel.addEventListener("click", select);
     panel.addEventListener("keydown", (event) => { if (["Enter", " "].includes(event.key)) select(); });
-    openingLayer.append(panel);
+    surfaces.push({ depth: (bottomFrom.y + bottomTo.y) / 2, order: 1, element: panel });
   }
   const boxes = [
     ...(plan.features ?? []).map((item) => ({ ...item, depth: item.height, displayHeight: item.worktopHeightCm ?? 55, type: "feature" })),
@@ -95,20 +142,26 @@ export function renderThreeView(canvas, documentData, quarterTurn = 0, onOpening
     const className = `three-box three-box-${item.type}`;
     for (const index of visibleBoxSideIndexes(bottom)) {
       const next = (index + 1) % bottom.length;
-      objectLayer.append(svg("polygon", {
+      surfaces.push({ depth: (bottom[index].y + bottom[next].y) / 2, order: 2, element: svg("polygon", {
         class: `${className} three-box-side`,
         points: pointsValue([bottom[index], bottom[next], top[next], top[index]]),
-      }));
+      }) });
     }
-    objectLayer.append(svg("polygon", { class: `${className} three-box-top`, points: pointsValue(top) }));
-    const center = project({ x: item.x + item.width / 2, y: item.y + item.depth / 2 }, item.displayHeight + 8);
-    objectLayer.append(svg("text", { class: "three-object-label", x: center.x, y: center.y }, item.name));
+    const baseDepth = bottom.reduce((sum, point) => sum + point.y, 0) / bottom.length;
+    surfaces.push({ depth: baseDepth, order: 3, element: svg("polygon", { class: `${className} three-box-top`, points: pointsValue(top) }) });
+    if (showLabels) {
+      const center = project({ x: item.x + item.width / 2, y: item.y + item.depth / 2 }, item.displayHeight + 8);
+      labelLayer.append(svg("text", { class: "three-object-label", x: center.x, y: center.y }, item.name));
+    }
   }
-  canvas.append(floorLayer, wallLayer, openingLayer, objectLayer);
+  surfaces.sort((first, second) => first.depth - second.depth || first.order - second.order);
+  sceneLayer.append(...surfaces.map((surface) => surface.element));
+  canvas.append(floorLayer, sceneLayer, labelLayer);
   return {
     rendered: true,
     openingCount: drawableOpenings.length,
     wallDisplayHeight,
+    hiddenWallCount,
     furnitureWithoutHeight: (plan.furniture ?? []).filter((item) => !Number.isFinite(item.heightCm)).length,
   };
 }

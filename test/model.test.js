@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { analyzeDeliveryRoute, analyzeFurnitureConflicts, analyzeFurniturePlacement, buildElevationItems, buildRoomWalls, buildWallDiagram, countQualities, createSamplePlan, duplicateFurniture, findDeliveryDoorPath, fitsRectangle, FORMAT, getDimensionGroup, getElectricalPlanPosition, moveDimensionGuide, pointInPolygon, rectanglesOverlap, rotateFurniture, snapToGrid, updateFurniture, validatePlan, wallDisplayWidth } from "../dist/model.js";
 import { buildKitchenComponentRects, detailMarkup, measurementMetrics, PlanRenderer, snapMeasurementPoint, zoomTransformAround } from "../dist/renderer.js";
-import { openingVerticalRange, projectThreePoint, visibleBoxSideIndexes } from "../dist/three.js";
+import { isCutawayEdge, openingVerticalRange, projectThreePoint, visibleBoxSideIndexes } from "../dist/three.js";
 
 test("sample plan conforms to the public schema", () => {
   const sample = createSamplePlan();
@@ -315,6 +315,12 @@ test("3D openings preserve measured door and window heights", () => {
   assert.deepEqual(openingVerticalRange({ kind: "door", from, to, heightCm: 199 }), { bottomCm: 0, topCm: 199, isWindow: false });
   assert.deepEqual(openingVerticalRange({ kind: "window", from, to, heightCm: 96.5, sillHeightCm: 88 }), { bottomCm: 88, topCm: 184.5, isWindow: true });
   assert.equal(openingVerticalRange({ kind: "window", from, to }), null);
+});
+
+test("3D cutaway walls follow the selected viewing direction", () => {
+  const room = [{ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 100, y: 100 }, { x: 0, y: 100 }];
+  assert.deepEqual(room.map((_, index) => isCutawayEdge(room, index, 0)), [false, true, true, false]);
+  assert.deepEqual(room.map((_, index) => isCutawayEdge(room, index, 2)), [true, false, false, true]);
 });
 
 test("all app element bindings exist in the HTML", () => {
