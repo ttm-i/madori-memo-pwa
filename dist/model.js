@@ -48,6 +48,84 @@ export function validatePlan(input) {
   return structuredClone(input);
 }
 
+export function findSupportItem(plan, supportId) {
+  if (!supportId) return null;
+  return (plan?.features ?? []).find((item) => item.id === supportId)
+    ?? (plan?.furniture ?? []).find((item) => item.id === supportId)
+    ?? null;
+}
+
+export function featureSupportRange(feature) {
+  if (feature?.kind === "washer-pan") return { bottomCm: 0, topCm: 4, schematic: true };
+  if (Number.isFinite(feature?.bottomHeightCm) && Number.isFinite(feature?.topHeightCm)) {
+    return { bottomCm: feature.bottomHeightCm, topCm: feature.topHeightCm, schematic: false };
+  }
+  if (Number.isFinite(feature?.undersideHeightCm) && Number.isFinite(feature?.derivedTopHeightCm)) {
+    return { bottomCm: feature.undersideHeightCm, topCm: feature.derivedTopHeightCm, schematic: false };
+  }
+  const topCm = feature?.worktopHeightCm ?? feature?.derivedInteriorHeightCm ?? feature?.topHeightCm;
+  if (Number.isFinite(topCm)) return { bottomCm: 0, topCm, schematic: false };
+  return { bottomCm: 0, topCm: 55, schematic: true };
+}
+
+export function resolveFurnitureVerticalRange(plan, furniture, visited = new Set()) {
+  const ownHeight = Number.isFinite(furniture?.heightCm) ? furniture.heightCm : 35;
+  if (!furniture?.supportId || visited.has(furniture.id)) {
+    return { bottomCm: 0, topCm: ownHeight, schematic: !Number.isFinite(furniture?.heightCm), support: null };
+  }
+  const nextVisited = new Set(visited).add(furniture.id);
+  const support = findSupportItem(plan, furniture.supportId);
+  if (!support) return { bottomCm: 0, topCm: ownHeight, schematic: true, support: null };
+  const supportIsFurniture = Number.isFinite(support.widthCm);
+  const supportRange = supportIsFurniture
+    ? resolveFurnitureVerticalRange(plan, support, nextVisited)
+    : featureSupportRange(support);
+  return {
+    bottomCm: supportRange.topCm,
+    topCm: supportRange.topCm + ownHeight,
+    schematic: supportRange.schematic || !Number.isFinite(furniture.heightCm),
+    support,
+  };
+}
+
+export function alignFurnitureToSupport(plan, furniture) {
+  const support = findSupportItem(plan, furniture?.supportId);
+  if (!support || support.id === furniture.id) return furniture;
+  const width = support.widthCm ?? support.width;
+  const depth = support.depthCm ?? support.height;
+  if (![support.x, support.y, width, depth].every(Number.isFinite)) return furniture;
+  furniture.x = support.x + (width - furniture.widthCm) / 2;
+  furniture.y = support.y + (depth - furniture.depthCm) / 2;
+  if (support.roomId) furniture.roomId = support.roomId;
+  return furniture;
+}
+
+export function alignSupportedFurniture(plan) {
+  const furnitureItems = plan?.furniture ?? [];
+  for (let pass = 0; pass < furnitureItems.length; pass += 1) {
+    for (const furniture of furnitureItems) alignFurnitureToSupport(plan, furniture);
+  }
+  return furnitureItems;
+}
+
+export function resolveFurnitureElevationPlacement(plan, furniture, visited = new Set()) {
+  if (!furniture || visited.has(furniture.id)) return null;
+  if (furniture.elevationWallId) {
+    return { wallId: furniture.elevationWallId, offsetCm: furniture.elevationOffsetCm ?? 0, widthCm: furniture.elevationWidthCm ?? furniture.widthCm };
+  }
+  const support = findSupportItem(plan, furniture.supportId);
+  if (!support) return null;
+  let base = null;
+  if (Number.isFinite(support.widthCm)) {
+    base = resolveFurnitureElevationPlacement(plan, support, new Set(visited).add(furniture.id));
+  } else if (support.elevationWallId) {
+    base = { wallId: support.elevationWallId, offsetCm: support.elevationOffsetCm ?? 0, widthCm: support.elevationWidthCm ?? support.internalWidthCm ?? support.overallWidthCm ?? support.width };
+  }
+  if (!base) return null;
+  const widthCm = furniture.elevationWidthCm ?? furniture.widthCm;
+  return { wallId: base.wallId, offsetCm: base.offsetCm + (base.widthCm - widthCm) / 2, widthCm };
+}
+
 export function countQualities(plan) {
   const items = [
     ...(plan.plan.rooms ?? []),
@@ -112,6 +190,13 @@ export function buildElevationItems(documentData, roomId) {
       addRange(feature.id, feature.name, "equipment", feature.undersideHeightCm, feature.derivedTopHeightCm,
         Number.isFinite(feature.depthCm) ? `奥行 ${feature.depthCm} cm` : "");
     }
+  }
+
+  for (const furniture of documentData.plan.furniture ?? []) {
+    if (!belongsToRoom(furniture, roomId)) continue;
+    const range = resolveFurnitureVerticalRange(documentData.plan, furniture);
+    const supportDetail = range.support ? `${range.support.name}の上` : "床置き";
+    addRange(furniture.id, furniture.name, "furniture", range.bottomCm, range.topCm, supportDetail);
   }
 
   for (const outlet of documentData.plan.electrical?.outlets ?? []) {
@@ -244,6 +329,12 @@ export function buildWallDiagram(documentData, roomId, wallId) {
       });
     }
   }
+  for (const furniture of documentData.plan.furniture ?? []) {
+    const placement = resolveFurnitureElevationPlacement(documentData.plan, furniture);
+    if (placement?.wallId !== wall.id) continue;
+    const related = verticalItems.find((item) => item.id === furniture.id);
+    if (related) items.push({ ...related, offsetCm: placement.offsetCm, widthCm: placement.widthCm });
+  }
   const electricalItems = [
     ...(documentData.plan.electrical?.outlets ?? []),
     ...(documentData.plan.electrical?.switches ?? []),
@@ -294,6 +385,8 @@ export function updateFurniture(furniture, values) {
   furniture.depthCm = values.depthCm;
   if (Number.isFinite(values.heightCm)) furniture.heightCm = values.heightCm;
   else delete furniture.heightCm;
+  if (values.supportId) furniture.supportId = values.supportId;
+  else delete furniture.supportId;
   furniture.x = centerX - furniture.widthCm / 2;
   furniture.y = centerY - furniture.depthCm / 2;
   return furniture;
@@ -463,11 +556,13 @@ function wallBounds(wall) {
 
 export function analyzeFurnitureConflicts(furniture, plan) {
   const conflicts = [];
+  const furnitureRange = resolveFurnitureVerticalRange(plan, furniture);
+  const overlapsVertically = (range) => furnitureRange.bottomCm < range.topCm - .001 && furnitureRange.topCm > range.bottomCm + .001;
   for (const other of plan.furniture ?? []) {
-    if (other.id !== furniture.id && rectanglesOverlap(furniture, other)) conflicts.push({ type: "furniture", id: other.id, name: other.name });
+    if (other.id !== furniture.id && overlapsVertically(resolveFurnitureVerticalRange(plan, other)) && rectanglesOverlap(furniture, other)) conflicts.push({ type: "furniture", id: other.id, name: other.name });
   }
   for (const feature of plan.features ?? []) {
-    if (rectanglesOverlap(furniture, feature)) conflicts.push({ type: "feature", id: feature.id, name: feature.name });
+    if (overlapsVertically(featureSupportRange(feature)) && rectanglesOverlap(furniture, feature)) conflicts.push({ type: "feature", id: feature.id, name: feature.name });
   }
   for (const wall of plan.walls ?? []) {
     if (rectanglesOverlap(furniture, wallBounds(wall))) conflicts.push({ type: "wall", id: wall.id, name: wall.name });

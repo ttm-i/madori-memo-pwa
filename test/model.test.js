@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { analyzeDeliveryRoute, analyzeFurnitureConflicts, analyzeFurniturePlacement, buildElevationItems, buildRoomWalls, buildWallDiagram, countQualities, createSamplePlan, duplicateFurniture, findDeliveryDoorPath, fitsRectangle, FORMAT, getDimensionGroup, getElectricalPlanPosition, moveDimensionGuide, pointInPolygon, rectanglesOverlap, rotateFurniture, snapToGrid, updateFurniture, validatePlan, wallDisplayWidth } from "../dist/model.js";
+import { alignFurnitureToSupport, analyzeDeliveryRoute, analyzeFurnitureConflicts, analyzeFurniturePlacement, buildElevationItems, buildRoomWalls, buildWallDiagram, countQualities, createSamplePlan, duplicateFurniture, findDeliveryDoorPath, fitsRectangle, FORMAT, getDimensionGroup, getElectricalPlanPosition, moveDimensionGuide, pointInPolygon, rectanglesOverlap, resolveFurnitureElevationPlacement, resolveFurnitureVerticalRange, rotateFurniture, snapToGrid, updateFurniture, validatePlan, wallDisplayWidth } from "../dist/model.js";
 import { buildKitchenComponentRects, detailMarkup, measurementMetrics, PlanRenderer, snapMeasurementPoint, zoomTransformAround } from "../dist/renderer.js";
 import { featureVerticalRange, isCutawayEdge, openingVerticalRange, projectThreePoint, splitWallFace, visibleBoxSideIndexes } from "../dist/three.js";
 
@@ -32,6 +32,7 @@ test("wall elevation items preserve measured heights without inventing a ceiling
   assert.deepEqual(items.map(({ name, bottomCm, topCm }) => ({ name, bottomCm, topCm })), [
     { name: "掃き出し窓", bottomCm: 0, topCm: 180 },
     { name: "洋室引き戸", bottomCm: 0, topCm: 200 },
+    { name: "サンプルソファ", bottomCm: 0, topCm: 35 },
   ]);
   assert.equal(items.some((item) => item.name.includes("天井")), false);
 });
@@ -275,6 +276,30 @@ test("furniture editing preserves its center while changing size", () => {
   assert.deepEqual(furniture, { id: "f1", name: "テーブル", roomId: "bedroom", x: 80, y: 185, widthCm: 140, depthCm: 80, heightCm: 72 });
   updateFurniture(furniture, { name: "テーブル", roomId: "bedroom", widthCm: 140, depthCm: 80, heightCm: null });
   assert.equal("heightCm" in furniture, false);
+});
+
+test("supported furniture aligns to its base and stacks measured heights", () => {
+  const plan = {
+    features: [{ id: "pan", name: "洗濯機パン", kind: "washer-pan", roomId: "washroom", x: 10, y: 20, width: 64, height: 64 }],
+    furniture: [
+      { id: "washer", name: "洗濯機", roomId: "washroom", supportId: "pan", x: 0, y: 0, widthCm: 60, depthCm: 60, heightCm: 105 },
+      { id: "rack", name: "上置き棚", roomId: "washroom", supportId: "washer", x: 0, y: 0, widthCm: 55, depthCm: 45, heightCm: 30 },
+    ],
+  };
+  alignFurnitureToSupport(plan, plan.furniture[0]);
+  alignFurnitureToSupport(plan, plan.furniture[1]);
+  assert.deepEqual({ x: plan.furniture[0].x, y: plan.furniture[0].y }, { x: 12, y: 22 });
+  assert.deepEqual(resolveFurnitureVerticalRange(plan, plan.furniture[0]), { bottomCm: 4, topCm: 109, schematic: true, support: plan.features[0] });
+  assert.equal(resolveFurnitureVerticalRange(plan, plan.furniture[1]).bottomCm, 109);
+  assert.deepEqual(analyzeFurnitureConflicts(plan.furniture[0], plan), []);
+});
+
+test("supported furniture inherits a fixed feature's elevation wall", () => {
+  const plan = {
+    features: [{ id: "counter", name: "カウンター", roomId: "ldk", elevationWallId: "wall-a", elevationOffsetCm: 10, elevationWidthCm: 80 }],
+    furniture: [{ id: "appliance", name: "家電", roomId: "ldk", supportId: "counter", widthCm: 50, depthCm: 40, heightCm: 30 }],
+  };
+  assert.deepEqual(resolveFurnitureElevationPlacement(plan, plan.furniture[0]), { wallId: "wall-a", offsetCm: 25, widthCm: 50 });
 });
 
 test("zoom keeps the content under the pinch midpoint fixed", () => {

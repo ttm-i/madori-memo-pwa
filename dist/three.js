@@ -1,3 +1,5 @@
+import { featureSupportRange, resolveFurnitureVerticalRange } from "./model.js?v=47";
+
 const NS = "http://www.w3.org/2000/svg";
 
 function svg(name, attributes = {}, text = "") {
@@ -34,16 +36,7 @@ export function openingVerticalRange(opening) {
 }
 
 export function featureVerticalRange(feature) {
-  if (feature?.kind === "washer-pan") return { bottomCm: 0, topCm: 4, schematic: true };
-  if (Number.isFinite(feature?.bottomHeightCm) && Number.isFinite(feature?.topHeightCm)) {
-    return { bottomCm: feature.bottomHeightCm, topCm: feature.topHeightCm, schematic: false };
-  }
-  if (Number.isFinite(feature?.undersideHeightCm) && Number.isFinite(feature?.derivedTopHeightCm)) {
-    return { bottomCm: feature.undersideHeightCm, topCm: feature.derivedTopHeightCm, schematic: false };
-  }
-  const topCm = feature?.worktopHeightCm ?? feature?.derivedInteriorHeightCm ?? feature?.topHeightCm;
-  if (Number.isFinite(topCm)) return { bottomCm: 0, topCm, schematic: false };
-  return { bottomCm: 0, topCm: 55, schematic: true };
+  return featureSupportRange(feature);
 }
 
 function polygonArea(points) {
@@ -215,7 +208,7 @@ export function renderThreeView(canvas, documentData, options = {}, onOpeningSel
   }
   const boxes = [
     ...featureItems,
-    ...(plan.furniture ?? []).map((item) => ({ ...item, width: item.widthCm, depth: item.depthCm, vertical: { bottomCm: 0, topCm: item.heightCm ?? 35, schematic: !Number.isFinite(item.heightCm) }, type: "furniture" })),
+    ...(plan.furniture ?? []).map((item) => ({ ...item, width: item.widthCm, depth: item.depthCm, vertical: resolveFurnitureVerticalRange(plan, item), type: "furniture" })),
   ].filter((item) => [item.x, item.y, item.width, item.depth].every(Number.isFinite));
   boxes.sort((a, b) => (a.x + a.y) - (b.x + b.y));
   for (const item of boxes) {

@@ -1,4 +1,4 @@
-import { analyzeFurnitureConflicts, analyzeFurniturePlacement, getDimensionGroup, getElectricalPlanPosition, moveDimensionGuide, QUALITY_LABELS, snapToGrid } from "./model.js?v=46";
+import { analyzeFurnitureConflicts, analyzeFurniturePlacement, getDimensionGroup, getElectricalPlanPosition, moveDimensionGuide, QUALITY_LABELS, snapToGrid } from "./model.js?v=47";
 
 const NS = "http://www.w3.org/2000/svg";
 
@@ -254,11 +254,12 @@ export class PlanRenderer {
       const placement = analyzeFurniturePlacement(furniture, room);
       const conflicts = analyzeFurnitureConflicts(furniture, documentData.plan);
       const selected = furniture.id === this.selectedFurnitureId;
-      const group = svg("g", { class: `furniture-group ${this.isSelectable("furniture") ? "" : "not-selectable"} ${selected ? "selected" : ""} ${placement.inside ? "" : "out-of-room"} ${conflicts.length ? "has-conflict" : ""}`, "data-furniture-id": furniture.id, tabindex: 0, role: "button", "aria-label": `${furniture.name}${placement.inside ? "" : " 部屋外"}${conflicts.length ? " 重なりあり" : ""}` });
+      const group = svg("g", { class: `furniture-group ${furniture.supportId ? "is-supported" : ""} ${this.isSelectable("furniture") ? "" : "not-selectable"} ${selected ? "selected" : ""} ${placement.inside ? "" : "out-of-room"} ${conflicts.length ? "has-conflict" : ""}`, "data-furniture-id": furniture.id, tabindex: 0, role: "button", "aria-label": `${furniture.name}${furniture.supportId ? " 上置き" : ""}${placement.inside ? "" : " 部屋外"}${conflicts.length ? " 重なりあり" : ""}` });
       const rect = svg("rect", { class: "furniture-shape", x: furniture.x, y: furniture.y, width: furniture.widthCm, height: furniture.depthCm, rx: 5 });
       const label = svg("text", { class: "furniture-label", x: furniture.x + furniture.widthCm / 2, y: furniture.y + furniture.depthCm / 2 - 7 }, furniture.name);
       const sizeLabel = svg("text", { class: "furniture-size-label", x: furniture.x + furniture.widthCm / 2, y: furniture.y + furniture.depthCm / 2 + 10 }, `${furniture.widthCm}×${furniture.depthCm}`);
       group.append(rect, label, sizeLabel);
+      if (furniture.supportId) group.append(svg("text", { class: "furniture-support-label", x: furniture.x + furniture.widthCm / 2, y: furniture.y + furniture.depthCm - 6 }, "上置き"));
       if (selected && placement.inside && placement.boundaries) {
         const centerX = furniture.x + furniture.widthCm / 2;
         const centerY = furniture.y + furniture.depthCm / 2;
@@ -291,7 +292,7 @@ export class PlanRenderer {
         if (this.isSelectable("furniture")) this.onSelect("furniture", furniture);
       });
       group.addEventListener("pointerdown", (event) => {
-        if (this.locked || !this.isSelectable("furniture")) return;
+        if (this.locked || furniture.supportId || !this.isSelectable("furniture")) return;
         event.stopPropagation();
         event.currentTarget.setPointerCapture?.(event.pointerId);
         this.draggingFurniture = {
@@ -739,6 +740,8 @@ export function detailMarkup(type, item) {
     }
     if (item.kind && item.kind !== "kitchen") values.push(["種類", item.kind]);
     if (type === "furniture" && item.roomName) values.push(["配置先", item.roomName]);
+    if (type === "furniture" && item.supportName) values.push(["設置面", `${item.supportName}の上`]);
+    if (type === "furniture" && item.vertical?.bottomCm > 0) values.push(["床から底面", `${item.vertical.bottomCm} cm`]);
     if (type === "furniture" && item.deliveryDimensions) {
       const dimensions = item.deliveryDimensions;
       values.push(["搬入時の3辺", `${dimensions.sideACm} × ${dimensions.sideBCm} × ${dimensions.sideCCm} cm`]);
