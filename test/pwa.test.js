@@ -25,3 +25,8 @@ test("offline app shell contains existing assets from one version", () => {
     }
   }
 });
+
+test("the redundant current-plan summary stays out of the 2D layout", () => {
+  const html = readFileSync(new URL("../dist/index.html", import.meta.url), "utf8");
+  assert.match(html, /<section class="summary-card"[^>]*\bhidden\b/);
+});
