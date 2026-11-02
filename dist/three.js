@@ -33,6 +33,18 @@ export function openingVerticalRange(opening) {
   return { bottomCm, topCm: bottomCm + opening.heightCm, isWindow };
 }
 
+export function featureVerticalRange(feature) {
+  if (Number.isFinite(feature?.bottomHeightCm) && Number.isFinite(feature?.topHeightCm)) {
+    return { bottomCm: feature.bottomHeightCm, topCm: feature.topHeightCm, schematic: false };
+  }
+  if (Number.isFinite(feature?.undersideHeightCm) && Number.isFinite(feature?.derivedTopHeightCm)) {
+    return { bottomCm: feature.undersideHeightCm, topCm: feature.derivedTopHeightCm, schematic: false };
+  }
+  const topCm = feature?.worktopHeightCm ?? feature?.derivedInteriorHeightCm ?? feature?.topHeightCm;
+  if (Number.isFinite(topCm)) return { bottomCm: 0, topCm, schematic: false };
+  return { bottomCm: 0, topCm: 55, schematic: true };
+}
+
 function polygonArea(points) {
   return points.reduce((sum, point, index) => {
     const next = points[(index + 1) % points.length];
@@ -125,7 +137,8 @@ export function renderThreeView(canvas, documentData, options = {}, onOpeningSel
   const { plan } = documentData;
   const bounds = plan.bounds;
   const drawableOpenings = (plan.openings ?? []).map((opening) => ({ opening, range: openingVerticalRange(opening) })).filter((item) => item.range);
-  const wallDisplayHeight = Math.max(220, ...drawableOpenings.map((item) => item.range.topCm + 20));
+  const featureItems = (plan.features ?? []).map((item) => ({ ...item, depth: item.height, vertical: featureVerticalRange(item), type: "feature" }));
+  const wallDisplayHeight = Math.max(220, ...drawableOpenings.map((item) => item.range.topCm + 20), ...featureItems.map((item) => item.vertical.topCm + 10));
   const projectedBounds = [
     { x: bounds.x, y: bounds.y }, { x: bounds.x + bounds.width, y: bounds.y },
     { x: bounds.x + bounds.width, y: bounds.y + bounds.height }, { x: bounds.x, y: bounds.y + bounds.height },
@@ -186,26 +199,28 @@ export function renderThreeView(canvas, documentData, options = {}, onOpeningSel
     surfaces.push({ depth: (bottomFrom.y + bottomTo.y) / 2, order: 1, element: panel });
   }
   const boxes = [
-    ...(plan.features ?? []).map((item) => ({ ...item, depth: item.height, displayHeight: item.worktopHeightCm ?? 55, type: "feature" })),
-    ...(plan.furniture ?? []).map((item) => ({ ...item, width: item.widthCm, depth: item.depthCm, displayHeight: item.heightCm ?? 35, type: "furniture" })),
+    ...featureItems,
+    ...(plan.furniture ?? []).map((item) => ({ ...item, width: item.widthCm, depth: item.depthCm, vertical: { bottomCm: 0, topCm: item.heightCm ?? 35, schematic: !Number.isFinite(item.heightCm) }, type: "furniture" })),
   ].filter((item) => [item.x, item.y, item.width, item.depth].every(Number.isFinite));
   boxes.sort((a, b) => (a.x + a.y) - (b.x + b.y));
   for (const item of boxes) {
     const base = [{x:item.x,y:item.y},{x:item.x+item.width,y:item.y},{x:item.x+item.width,y:item.y+item.depth},{x:item.x,y:item.y+item.depth}];
-    const top = base.map((point) => project(point, item.displayHeight));
-    const bottom = base.map((point) => project(point));
-    const className = `three-box three-box-${item.type}`;
-    for (const index of visibleBoxSideIndexes(bottom)) {
+    const top = base.map((point) => project(point, item.vertical.topCm));
+    const bottom = base.map((point) => project(point, item.vertical.bottomCm));
+    const depthBase = base.map((point) => project(point));
+    const kindClass = item.kind ? ` three-box-kind-${String(item.kind).replace(/[^a-z0-9-]/gi, "-")}` : "";
+    const className = `three-box three-box-${item.type}${kindClass}${item.vertical.schematic ? " is-schematic" : ""}`;
+    for (const index of visibleBoxSideIndexes(depthBase)) {
       const next = (index + 1) % bottom.length;
-      surfaces.push({ depth: (bottom[index].y + bottom[next].y) / 2, order: 2, element: svg("polygon", {
+      surfaces.push({ depth: (depthBase[index].y + depthBase[next].y) / 2, order: 2, element: svg("polygon", {
         class: `${className} three-box-side`,
         points: pointsValue([bottom[index], bottom[next], top[next], top[index]]),
       }) });
     }
-    const baseDepth = bottom.reduce((sum, point) => sum + point.y, 0) / bottom.length;
+    const baseDepth = depthBase.reduce((sum, point) => sum + point.y, 0) / depthBase.length;
     surfaces.push({ depth: baseDepth, order: 3, element: svg("polygon", { class: `${className} three-box-top`, points: pointsValue(top) }) });
     if (showLabels) {
-      const center = project({ x: item.x + item.width / 2, y: item.y + item.depth / 2 }, item.displayHeight + 8);
+      const center = project({ x: item.x + item.width / 2, y: item.y + item.depth / 2 }, item.vertical.topCm + 8);
       labelLayer.append(svg("text", { class: "three-object-label", x: center.x, y: center.y }, item.name));
     }
   }

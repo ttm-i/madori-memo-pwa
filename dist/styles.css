@@ -228,8 +228,12 @@ button { color: inherit; touch-action: manipulation; }
 .three-opening:focus { outline: none; stroke: var(--accent); stroke-width: 4; }
 .three-box { stroke-width: 1.5; }
 .three-box-feature { fill: rgba(94,145,127,.76); stroke: #467865; }
+.three-box-kind-closet { fill: rgba(94,145,127,.14); stroke: #467865; stroke-dasharray: 5 3; }
+.three-box-kind-closet.three-box-top { fill: rgba(94,145,127,.08); }
+.three-box-kind-cabinet { fill: rgba(94,145,127,.4); }
+.three-box-kind-counter { fill: rgba(94,145,127,.55); }
 .three-box-furniture { fill: rgba(183,126,86,.72); stroke: #915f3f; }
-.three-box-side { filter: brightness(.82); }
+.three-box-side { filter: brightness(.88); }
 .three-object-label { fill: #333934; font-size: 11px; font-weight: 800; text-anchor: middle; paint-order: stroke; stroke: rgba(255,255,255,.88); stroke-width: 4px; }
 .three-legend { display: flex; flex-wrap: wrap; gap: 10px 15px; padding: 10px 4px 4px; color: var(--muted); font-size: .64rem; }
 .three-legend span { display: inline-flex; align-items: center; gap: 5px; }

@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { analyzeDeliveryRoute, analyzeFurnitureConflicts, analyzeFurniturePlacement, buildElevationItems, buildRoomWalls, buildWallDiagram, countQualities, createSamplePlan, duplicateFurniture, findDeliveryDoorPath, fitsRectangle, FORMAT, getDimensionGroup, getElectricalPlanPosition, moveDimensionGuide, pointInPolygon, rectanglesOverlap, rotateFurniture, snapToGrid, updateFurniture, validatePlan, wallDisplayWidth } from "../dist/model.js";
 import { buildKitchenComponentRects, detailMarkup, measurementMetrics, PlanRenderer, snapMeasurementPoint, zoomTransformAround } from "../dist/renderer.js";
-import { isCutawayEdge, openingVerticalRange, projectThreePoint, splitWallFace, visibleBoxSideIndexes } from "../dist/three.js";
+import { featureVerticalRange, isCutawayEdge, openingVerticalRange, projectThreePoint, splitWallFace, visibleBoxSideIndexes } from "../dist/three.js";
 
 test("sample plan conforms to the public schema", () => {
   const sample = createSamplePlan();
@@ -330,6 +330,13 @@ test("3D wall faces are split around door and window openings", () => {
     { u1: 100, u2: 180, z1: 199, z2: 220 },
   ]);
   assert.equal(splitWallFace(300, 220, [{ u1: 80, u2: 180, z1: 88, z2: 184.5 }]).length, 4);
+});
+
+test("3D equipment uses measured vertical ranges without making tall closets opaque", () => {
+  assert.deepEqual(featureVerticalRange({ kind: "closet", derivedInteriorHeightCm: 232 }), { bottomCm: 0, topCm: 232, schematic: false });
+  assert.deepEqual(featureVerticalRange({ kind: "cabinet", bottomHeightCm: 8, topHeightCm: 112 }), { bottomCm: 8, topCm: 112, schematic: false });
+  assert.deepEqual(featureVerticalRange({ kind: "counter", undersideHeightCm: 90, derivedTopHeightCm: 91.5 }), { bottomCm: 90, topCm: 91.5, schematic: false });
+  assert.deepEqual(featureVerticalRange({ kind: "unknown" }), { bottomCm: 0, topCm: 55, schematic: true });
 });
 
 test("all app element bindings exist in the HTML", () => {
