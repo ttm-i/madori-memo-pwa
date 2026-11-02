@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { analyzeDeliveryRoute, analyzeFurnitureConflicts, analyzeFurniturePlacement, buildElevationItems, buildRoomWalls, buildWallDiagram, countQualities, createSamplePlan, duplicateFurniture, findDeliveryDoorPath, fitsRectangle, FORMAT, getDimensionGroup, getElectricalPlanPosition, moveDimensionGuide, pointInPolygon, rectanglesOverlap, rotateFurniture, snapToGrid, updateFurniture, validatePlan, wallDisplayWidth } from "../dist/model.js";
 import { buildKitchenComponentRects, detailMarkup, measurementMetrics, PlanRenderer, snapMeasurementPoint, zoomTransformAround } from "../dist/renderer.js";
-import { projectThreePoint, visibleBoxSideIndexes } from "../dist/three.js";
+import { openingVerticalRange, projectThreePoint, visibleBoxSideIndexes } from "../dist/three.js";
 
 test("sample plan conforms to the public schema", () => {
   const sample = createSamplePlan();
@@ -308,6 +308,13 @@ test("3D boxes choose the two front faces after every rotation", () => {
   assert.equal(initial.length, 2);
   assert.equal(rotated.length, 2);
   assert.notDeepEqual(initial, rotated);
+});
+
+test("3D openings preserve measured door and window heights", () => {
+  const from = { x: 0, y: 0 }; const to = { x: 100, y: 0 };
+  assert.deepEqual(openingVerticalRange({ kind: "door", from, to, heightCm: 199 }), { bottomCm: 0, topCm: 199, isWindow: false });
+  assert.deepEqual(openingVerticalRange({ kind: "window", from, to, heightCm: 96.5, sillHeightCm: 88 }), { bottomCm: 88, topCm: 184.5, isWindow: true });
+  assert.equal(openingVerticalRange({ kind: "window", from, to }), null);
 });
 
 test("all app element bindings exist in the HTML", () => {

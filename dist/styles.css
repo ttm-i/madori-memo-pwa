@@ -219,6 +219,10 @@ button { color: inherit; touch-action: manipulation; }
 .three-floor { stroke: #8d9188; stroke-width: 2; }
 .three-room-label { fill: #646a63; font-size: 14px; font-weight: 800; text-anchor: middle; paint-order: stroke; stroke: rgba(255,255,255,.8); stroke-width: 5px; }
 .three-wall { fill: rgba(214,209,196,.78); stroke: #777d75; stroke-width: 1.5; }
+.three-opening { cursor: pointer; stroke-width: 2.5; vector-effect: non-scaling-stroke; }
+.three-opening-door { fill: rgba(247,242,232,.96); stroke: #8a6848; }
+.three-opening-window { fill: rgba(130,196,219,.62); stroke: #41778b; }
+.three-opening:focus { outline: none; stroke: var(--accent); stroke-width: 4; }
 .three-box { stroke-width: 1.5; }
 .three-box-feature { fill: rgba(94,145,127,.76); stroke: #467865; }
 .three-box-furniture { fill: rgba(183,126,86,.72); stroke: #915f3f; }
@@ -228,6 +232,8 @@ button { color: inherit; touch-action: manipulation; }
 .three-legend span { display: inline-flex; align-items: center; gap: 5px; }
 .three-legend i { width: 11px; height: 11px; border: 1px solid currentColor; border-radius: 3px; }
 .three-legend-wall { background: #d6d1c4; color: #777d75; }
+.three-legend-door { background: #f7f2e8; color: #8a6848; }
+.three-legend-window { background: #82c4db; color: #41778b; }
 .three-legend-feature { background: #6b9e89; color: #467865; }
 .three-legend-furniture { background: #bd8763; color: #915f3f; }
 .three-note { margin: 4px; color: #8a633a; font-size: .65rem; line-height: 1.5; }

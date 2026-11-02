@@ -26,17 +26,26 @@ export function visibleBoxSideIndexes(projectedBase) {
     .map((item) => item.index);
 }
 
-export function renderThreeView(canvas, documentData, quarterTurn = 0) {
+export function openingVerticalRange(opening) {
+  if (!opening?.from || !opening?.to || !Number.isFinite(opening.heightCm) || opening.heightCm <= 0) return null;
+  const isWindow = String(opening.kind ?? "").includes("window");
+  const bottomCm = isWindow && Number.isFinite(opening.sillHeightCm) ? opening.sillHeightCm : 0;
+  return { bottomCm, topCm: bottomCm + opening.heightCm, isWindow };
+}
+
+export function renderThreeView(canvas, documentData, quarterTurn = 0, onOpeningSelect = null) {
   canvas.replaceChildren();
   if (!documentData?.plan) return { rendered: false };
   const { plan } = documentData;
   const bounds = plan.bounds;
+  const drawableOpenings = (plan.openings ?? []).map((opening) => ({ opening, range: openingVerticalRange(opening) })).filter((item) => item.range);
+  const wallDisplayHeight = Math.max(220, ...drawableOpenings.map((item) => item.range.topCm + 20));
   const projectedBounds = [
     { x: bounds.x, y: bounds.y }, { x: bounds.x + bounds.width, y: bounds.y },
     { x: bounds.x + bounds.width, y: bounds.y + bounds.height }, { x: bounds.x, y: bounds.y + bounds.height },
   ].map((point) => projectThreePoint(point, bounds, quarterTurn));
   const rawWidth = Math.max(...projectedBounds.map((point) => point.x)) - Math.min(...projectedBounds.map((point) => point.x));
-  const rawHeight = Math.max(...projectedBounds.map((point) => point.y)) - Math.min(...projectedBounds.map((point) => point.y)) + 150;
+  const rawHeight = Math.max(...projectedBounds.map((point) => point.y)) - Math.min(...projectedBounds.map((point) => point.y)) + wallDisplayHeight * .62;
   const scale = Math.min(760 / rawWidth, 500 / rawHeight);
   const project = (point, z = 0) => {
     const value = projectThreePoint(point, bounds, quarterTurn, z);
@@ -45,6 +54,7 @@ export function renderThreeView(canvas, documentData, quarterTurn = 0) {
   const floorLayer = svg("g", { class: "three-floor-layer" });
   const objectLayer = svg("g", { class: "three-object-layer" });
   const wallLayer = svg("g", { class: "three-wall-layer" });
+  const openingLayer = svg("g", { class: "three-opening-layer" });
   for (const room of plan.rooms ?? []) {
     floorLayer.append(svg("polygon", { class: "three-floor", points: pointsValue(room.points.map((point) => project(point))), fill: room.color ?? "#e9e4d8" }));
     const labelPoint = project(room.label ?? room.points[0]);
@@ -53,9 +63,25 @@ export function renderThreeView(canvas, documentData, quarterTurn = 0) {
       if (room.nonWallEdges?.includes(index)) return;
       const to = room.points[(index + 1) % room.points.length];
       const bottomA = project(from); const bottomB = project(to);
-      const topA = project(from, 95); const topB = project(to, 95);
+      const topA = project(from, wallDisplayHeight); const topB = project(to, wallDisplayHeight);
       wallLayer.append(svg("polygon", { class: "three-wall", points: pointsValue([bottomA, bottomB, topB, topA]) }));
     });
+  }
+  for (const { opening, range } of drawableOpenings) {
+    const panel = svg("polygon", {
+      class: `three-opening three-opening-${range.isWindow ? "window" : "door"}`,
+      points: pointsValue([
+        project(opening.from, range.bottomCm), project(opening.to, range.bottomCm),
+        project(opening.to, range.topCm), project(opening.from, range.topCm),
+      ]),
+      role: "button",
+      tabindex: 0,
+      "aria-label": `${opening.name}の詳細を表示`,
+    });
+    const select = () => onOpeningSelect?.(opening);
+    panel.addEventListener("click", select);
+    panel.addEventListener("keydown", (event) => { if (["Enter", " "].includes(event.key)) select(); });
+    openingLayer.append(panel);
   }
   const boxes = [
     ...(plan.features ?? []).map((item) => ({ ...item, depth: item.height, displayHeight: item.worktopHeightCm ?? 55, type: "feature" })),
@@ -78,6 +104,11 @@ export function renderThreeView(canvas, documentData, quarterTurn = 0) {
     const center = project({ x: item.x + item.width / 2, y: item.y + item.depth / 2 }, item.displayHeight + 8);
     objectLayer.append(svg("text", { class: "three-object-label", x: center.x, y: center.y }, item.name));
   }
-  canvas.append(floorLayer, wallLayer, objectLayer);
-  return { rendered: true, furnitureWithoutHeight: (plan.furniture ?? []).filter((item) => !Number.isFinite(item.heightCm)).length };
+  canvas.append(floorLayer, wallLayer, openingLayer, objectLayer);
+  return {
+    rendered: true,
+    openingCount: drawableOpenings.length,
+    wallDisplayHeight,
+    furnitureWithoutHeight: (plan.furniture ?? []).filter((item) => !Number.isFinite(item.heightCm)).length,
+  };
 }

@@ -10,7 +10,7 @@
     <meta name="description" content="間取りと家具寸法を端末内だけで確認するオフラインPWA" />
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" href="./icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="./styles.css?v=41" />
+    <link rel="stylesheet" href="./styles.css?v=42" />
     <title>間取りメモ</title>
   </head>
   <body>
@@ -221,7 +221,7 @@
             <svg id="threeCanvas" viewBox="0 0 900 620" role="img" aria-label="間取りの概略3D"></svg>
             <div id="threeEmpty" class="wall-empty"><strong>間取りデータがありません</strong><span>JSONを読み込むと概略3Dを表示します。</span></div>
           </div>
-          <div class="three-legend"><span><i class="three-legend-wall"></i>壁（模式高さ）</span><span><i class="three-legend-feature"></i>設備</span><span><i class="three-legend-furniture"></i>家具</span></div>
+          <div class="three-legend"><span><i class="three-legend-wall"></i>壁（模式高さ）</span><span><i class="three-legend-door"></i>ドア</span><span><i class="three-legend-window"></i>窓</span><span><i class="three-legend-feature"></i>設備</span><span><i class="three-legend-furniture"></i>家具</span></div>
           <p id="threeHeightNote" class="three-note"></p>
         </section>
       </main>
@@ -323,7 +323,7 @@
       <input id="fileInput" type="file" accept="application/json,.json" hidden />
       <div id="toast" class="toast" role="status" aria-live="polite"></div>
     </div>
-    <script type="module" src="./app.js?v=41"></script>
+    <script type="module" src="./app.js?v=42"></script>
   </body>
 </html>
 
