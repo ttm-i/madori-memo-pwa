@@ -1,4 +1,4 @@
-import { analyzeFurnitureConflicts, analyzeFurniturePlacement, getDimensionGroup, getElectricalPlanPosition, moveDimensionGuide, QUALITY_LABELS, snapToGrid } from "./model.js?v=37";
+import { analyzeFurnitureConflicts, analyzeFurniturePlacement, getDimensionGroup, getElectricalPlanPosition, moveDimensionGuide, QUALITY_LABELS, snapToGrid } from "./model.js?v=38";
 
 const NS = "http://www.w3.org/2000/svg";
 
@@ -365,26 +365,32 @@ export class PlanRenderer {
     const group = svg("g", { class: "measurement-overlay" });
     const { from, to } = this.measurement;
     if (!from) return group;
+    const lineLength = to ? Math.hypot(to.x - from.x, to.y - from.y) : 0;
+    const cap = lineLength
+      ? { x: -(to.y - from.y) / lineLength * 6, y: (to.x - from.x) / lineLength * 6 }
+      : { x: 0, y: 6 };
     const makeHandle = (key, point) => {
-      const isActive = this.draggingMeasurement?.key === key
-        || (this.measurementPointer?.action === key && (key === "from" || to));
       const handle = svg("g", {
-        class: `measurement-handle measurement-handle-${key}${isActive ? " is-active" : ""}`,
+        class: `measurement-handle measurement-handle-${key}`,
         role: "button",
         tabindex: 0,
         "aria-label": key === "from" ? "測定の始点" : "測定の終点",
       });
       handle.append(
         svg("circle", { class: "measurement-handle-hit", cx: point.x, cy: point.y, r: 24 }),
-        svg("circle", { class: "measurement-handle-dot", cx: point.x, cy: point.y, r: isActive ? 7 : 4 }),
-        svg("text", { class: "measurement-handle-label", x: point.x + 10, y: point.y - 9 }, key === "from" ? "始" : "終"),
+        svg("line", {
+          class: "measurement-handle-cap",
+          x1: point.x - cap.x,
+          y1: point.y - cap.y,
+          x2: point.x + cap.x,
+          y2: point.y + cap.y,
+        }),
+        svg("circle", { class: "measurement-handle-dot", cx: point.x, cy: point.y, r: 1.8 }),
       );
       handle.addEventListener("pointerdown", (event) => {
         event.preventDefault();
         event.stopPropagation();
         if (this.promoteMeasurementGestureToPinch(event)) return;
-        handle.classList.add("is-active");
-        handle.querySelector(".measurement-handle-dot")?.setAttribute("r", 7);
         event.currentTarget.setPointerCapture?.(event.pointerId);
         this.draggingMeasurement = {
           key,

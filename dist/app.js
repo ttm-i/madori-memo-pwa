@@ -1,6 +1,6 @@
-import { deleteActivePlan, loadActivePlan, saveActivePlan } from "./db.js?v=37";
-import { analyzeDeliveryRoute, analyzeFurnitureConflicts, analyzeFurniturePlacement, buildElevationItems, buildRoomWalls, buildWallDiagram, countQualities, createSamplePlan, DIMENSION_GROUP_LABELS, duplicateFurniture, getDimensionGroup, getElectricalPlanPosition, rotateFurniture, updateFurniture, validatePlan, wallDisplayWidth } from "./model.js?v=37";
-import { detailMarkup, measurementMetrics, PlanRenderer } from "./renderer.js?v=37";
+import { deleteActivePlan, loadActivePlan, saveActivePlan } from "./db.js?v=38";
+import { analyzeDeliveryRoute, analyzeFurnitureConflicts, analyzeFurniturePlacement, buildElevationItems, buildRoomWalls, buildWallDiagram, countQualities, createSamplePlan, DIMENSION_GROUP_LABELS, duplicateFurniture, getDimensionGroup, getElectricalPlanPosition, rotateFurniture, updateFurniture, validatePlan, wallDisplayWidth } from "./model.js?v=38";
+import { detailMarkup, measurementMetrics, PlanRenderer } from "./renderer.js?v=38";
 
 const elements = Object.fromEntries([
   "menuButton", "dataMenu", "detailDialog", "detailType", "detailTitle", "detailBody", "fileInput",
