@@ -1,7 +1,7 @@
-import { deleteActivePlan, loadActivePlan, saveActivePlan } from "./db.js?v=49";
-import { alignFurnitureToSupport, alignSupportedFurniture, analyzeDeliveryRoute, analyzeFurnitureConflicts, analyzeFurniturePlacement, buildElevationItems, buildRoomWalls, buildWallDiagram, countQualities, createSamplePlan, DIMENSION_GROUP_LABELS, duplicateFurniture, findSupportItem, getDimensionGroup, getElectricalPlanPosition, resolveFurnitureVerticalRange, rotateFurniture, updateFurniture, validatePlan, wallDisplayWidth } from "./model.js?v=49";
-import { detailMarkup, measurementMetrics, PlanRenderer } from "./renderer.js?v=49";
-import { renderThreeView } from "./three.js?v=49";
+import { deleteActivePlan, loadActivePlan, saveActivePlan } from "./db.js?v=50";
+import { alignFurnitureToSupport, alignSupportedFurniture, analyzeDeliveryRoute, analyzeFurnitureConflicts, analyzeFurniturePlacement, buildElevationItems, buildRoomWalls, buildWallDiagram, countQualities, createSamplePlan, DIMENSION_GROUP_LABELS, duplicateFurniture, findSupportItem, getDimensionGroup, getElectricalPlanPosition, resolveFurnitureVerticalRange, rotateFurniture, updateFurniture, validatePlan, wallDisplayWidth } from "./model.js?v=50";
+import { detailMarkup, measurementMetrics, PlanRenderer } from "./renderer.js?v=50";
+import { renderThreeView } from "./three.js?v=50";
 
 const elements = Object.fromEntries([
   "menuButton", "dataMenu", "detailDialog", "detailType", "detailTitle", "detailBody", "fileInput",
@@ -15,7 +15,7 @@ const elements = Object.fromEntries([
   "summaryTitle", "roomCount", "measuredCount", "uncertainCount", "connectionBadge", "saveStatus", "toast",
   "furnitureButton", "furnitureDialog", "furnitureForm", "cancelFurnitureButton",
   "furnitureName", "furnitureWidth", "furnitureDepth", "furnitureHeight", "furnitureRoom", "furniturePreset", "furnitureSupport", "furnitureSupportHelp",
-  "furnitureActions", "rotateFurnitureButton", "duplicateFurnitureButton", "deleteFurnitureButton",
+  "furnitureViewActions", "showFurnitureClearanceButton", "furnitureActions", "rotateFurnitureButton", "duplicateFurnitureButton", "deleteFurnitureButton",
   "furnitureRoomEditGroup", "furnitureRoomEdit",
   "editFurnitureButton", "furnitureDialogTitle", "furnitureSubmitButton",
   "furnitureListButton", "furnitureListDialog", "furnitureList", "furnitureListCount",
@@ -33,6 +33,7 @@ let activePlan = null;
 let toastTimer = null;
 let selectedFurnitureId = null;
 let editingFurnitureId = null;
+let preserveFurnitureSelectionOnClose = false;
 let locked = true;
 let dimensionGroups = new Set();
 let selectedWallRoomId = null;
@@ -653,8 +654,10 @@ function showDetail(type, item) {
     return;
   }
   selectedFurnitureId = type === "furniture" ? item.id : null;
+  preserveFurnitureSelectionOnClose = false;
   renderer.setSelectedFurniture(selectedFurnitureId);
   const furnitureEditable = type === "furniture" && !locked;
+  elements.furnitureViewActions.hidden = type !== "furniture";
   elements.furnitureActions.hidden = !furnitureEditable;
   elements.furnitureRoomEditGroup.hidden = !furnitureEditable;
   const typeLabels = { room: "ROOM", dimension: "DIMENSION", opening: "OPENING", feature: "EQUIPMENT", outlet: "OUTLET", switch: "SWITCH", furniture: "FURNITURE" };
@@ -680,8 +683,18 @@ elements.detailDialog.addEventListener("click", (event) => {
   if (event.target === elements.detailDialog) elements.detailDialog.close();
 });
 elements.detailDialog.addEventListener("close", () => {
+  if (preserveFurnitureSelectionOnClose) {
+    preserveFurnitureSelectionOnClose = false;
+    return;
+  }
   selectedFurnitureId = null;
   renderer.setSelectedFurniture(null);
+});
+elements.showFurnitureClearanceButton.addEventListener("click", () => {
+  if (!selectedFurniture()) return;
+  preserveFurnitureSelectionOnClose = true;
+  elements.detailDialog.close();
+  showToast("空白部分をタップすると距離表示を終了します");
 });
 
 function selectedFurniture() {
