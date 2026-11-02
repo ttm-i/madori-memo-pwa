@@ -10,7 +10,7 @@
     <meta name="description" content="間取りと家具寸法を端末内だけで確認するオフラインPWA" />
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" href="./icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="./styles.css?v=40" />
+    <link rel="stylesheet" href="./styles.css?v=41" />
     <title>間取りメモ</title>
   </head>
   <body>
@@ -290,6 +290,7 @@
             <label class="field-label">幅（cm）<input id="furnitureWidth" name="width" type="number" min="1" max="1000" step="0.1" inputmode="decimal" required /></label>
             <label class="field-label">奥行（cm）<input id="furnitureDepth" name="depth" type="number" min="1" max="1000" step="0.1" inputmode="decimal" required /></label>
           </div>
+          <label class="field-label">高さ（cm・任意）<input id="furnitureHeight" name="height" type="number" min="1" max="1000" step="0.1" inputmode="decimal" placeholder="未測定なら空欄" /></label>
           <label class="field-label">設置する部屋<select id="furnitureRoom" name="room"></select></label>
           <p class="form-help">選んだ部屋を基準に、部屋外判定と壁までの距離を計算します。追加後は「🔓 編集」で移動できます。</p>
           <button id="furnitureSubmitButton" class="primary-button full-width" type="submit">追加する</button>
@@ -322,7 +323,7 @@
       <input id="fileInput" type="file" accept="application/json,.json" hidden />
       <div id="toast" class="toast" role="status" aria-live="polite"></div>
     </div>
-    <script type="module" src="./app.js?v=40"></script>
+    <script type="module" src="./app.js?v=41"></script>
   </body>
 </html>
 

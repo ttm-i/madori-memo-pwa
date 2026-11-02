@@ -1,4 +1,4 @@
-import { analyzeFurnitureConflicts, analyzeFurniturePlacement, getDimensionGroup, getElectricalPlanPosition, moveDimensionGuide, QUALITY_LABELS, snapToGrid } from "./model.js?v=40";
+import { analyzeFurnitureConflicts, analyzeFurniturePlacement, getDimensionGroup, getElectricalPlanPosition, moveDimensionGuide, QUALITY_LABELS, snapToGrid } from "./model.js?v=41";
 
 const NS = "http://www.w3.org/2000/svg";
 
@@ -733,6 +733,7 @@ export function detailMarkup(type, item) {
     } else {
       if (Number.isFinite(item.widthCm)) values.push(["幅", `${item.widthCm} cm`]);
       if (Number.isFinite(item.depthCm)) values.push(["奥行", `${item.depthCm} cm`]);
+      if (type === "furniture") values.push(["高さ", Number.isFinite(item.heightCm) ? `${item.heightCm} cm` : "未登録"]);
       if (!Number.isFinite(item.widthCm) && Number.isFinite(item.width)) values.push(["表示幅", `${item.width} cm`]);
       if (!Number.isFinite(item.depthCm) && Number.isFinite(item.height)) values.push(["表示奥行", `${item.height} cm`]);
     }

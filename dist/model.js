@@ -292,6 +292,8 @@ export function updateFurniture(furniture, values) {
   furniture.roomId = values.roomId;
   furniture.widthCm = values.widthCm;
   furniture.depthCm = values.depthCm;
+  if (Number.isFinite(values.heightCm)) furniture.heightCm = values.heightCm;
+  else delete furniture.heightCm;
   furniture.x = centerX - furniture.widthCm / 2;
   furniture.y = centerY - furniture.depthCm / 2;
   return furniture;

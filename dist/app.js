@@ -1,7 +1,7 @@
-import { deleteActivePlan, loadActivePlan, saveActivePlan } from "./db.js?v=40";
-import { analyzeDeliveryRoute, analyzeFurnitureConflicts, analyzeFurniturePlacement, buildElevationItems, buildRoomWalls, buildWallDiagram, countQualities, createSamplePlan, DIMENSION_GROUP_LABELS, duplicateFurniture, getDimensionGroup, getElectricalPlanPosition, rotateFurniture, updateFurniture, validatePlan, wallDisplayWidth } from "./model.js?v=40";
-import { detailMarkup, measurementMetrics, PlanRenderer } from "./renderer.js?v=40";
-import { renderThreeView } from "./three.js?v=40";
+import { deleteActivePlan, loadActivePlan, saveActivePlan } from "./db.js?v=41";
+import { analyzeDeliveryRoute, analyzeFurnitureConflicts, analyzeFurniturePlacement, buildElevationItems, buildRoomWalls, buildWallDiagram, countQualities, createSamplePlan, DIMENSION_GROUP_LABELS, duplicateFurniture, getDimensionGroup, getElectricalPlanPosition, rotateFurniture, updateFurniture, validatePlan, wallDisplayWidth } from "./model.js?v=41";
+import { detailMarkup, measurementMetrics, PlanRenderer } from "./renderer.js?v=41";
+import { renderThreeView } from "./three.js?v=41";
 
 const elements = Object.fromEntries([
   "menuButton", "dataMenu", "detailDialog", "detailType", "detailTitle", "detailBody", "fileInput",
@@ -14,7 +14,7 @@ const elements = Object.fromEntries([
   "furnitureMenuButton", "furnitureMenu", "snapToggle",
   "summaryTitle", "roomCount", "measuredCount", "uncertainCount", "connectionBadge", "saveStatus", "toast",
   "furnitureButton", "furnitureDialog", "furnitureForm", "cancelFurnitureButton",
-  "furnitureName", "furnitureWidth", "furnitureDepth", "furnitureRoom", "furniturePreset",
+  "furnitureName", "furnitureWidth", "furnitureDepth", "furnitureHeight", "furnitureRoom", "furniturePreset",
   "furnitureActions", "rotateFurnitureButton", "duplicateFurnitureButton", "deleteFurnitureButton",
   "furnitureRoomEditGroup", "furnitureRoomEdit",
   "editFurnitureButton", "furnitureDialogTitle", "furnitureSubmitButton",
@@ -652,7 +652,9 @@ function renderFurnitureList() {
     roomLabel.textContent = `${room?.name ?? "未設定"}${status}`;
     const size = document.createElement("span");
     size.className = "furniture-list-size";
-    size.textContent = `${furniture.widthCm}×${furniture.depthCm} cm`;
+    size.textContent = Number.isFinite(furniture.heightCm)
+      ? `${furniture.widthCm}×${furniture.depthCm}×高さ${furniture.heightCm} cm`
+      : `${furniture.widthCm}×${furniture.depthCm} cm・高さ未登録`;
     row.append(name, roomLabel, size);
     row.addEventListener("click", () => {
       elements.furnitureListDialog.close();
@@ -783,6 +785,7 @@ elements.furnitureButton.addEventListener("click", () => {
   elements.furnitureRoom.replaceChildren(...activePlan.plan.rooms.map((room) => new Option(room.name, room.id)));
   elements.furnitureWidth.value = "100";
   elements.furnitureDepth.value = "50";
+  elements.furnitureHeight.value = "";
   elements.furnitureName.value = "家具";
   elements.furniturePreset.value = "custom";
   elements.furnitureDialogTitle.textContent = "家具を追加";
@@ -841,13 +844,16 @@ elements.furnitureForm.addEventListener("submit", async (event) => {
   const room = activePlan.plan.rooms.find((item) => item.id === elements.furnitureRoom.value) ?? activePlan.plan.rooms[0];
   const widthCm = Number(elements.furnitureWidth.value);
   const depthCm = Number(elements.furnitureDepth.value);
+  const heightText = elements.furnitureHeight.value.trim();
+  const heightCm = heightText === "" ? null : Number(heightText);
   if (!Number.isFinite(widthCm) || !Number.isFinite(depthCm) || widthCm <= 0 || depthCm <= 0) return showToast("家具寸法を確認してください");
+  if (heightCm !== null && (!Number.isFinite(heightCm) || heightCm <= 0)) return showToast("家具の高さを確認してください");
   const name = elements.furnitureName.value.trim() || "家具";
   if (editingFurnitureId) {
     const furniture = activePlan.plan.furniture.find((item) => item.id === editingFurnitureId);
     if (!furniture) return showToast("編集する家具が見つかりません");
     pushHistory();
-    updateFurniture(furniture, { name, roomId: room.id, widthCm, depthCm });
+    updateFurniture(furniture, { name, roomId: room.id, widthCm, depthCm, heightCm });
     renderer.render(activePlan);
     renderDeliveryView();
     await persistActivePlan();
@@ -859,7 +865,7 @@ elements.furnitureForm.addEventListener("submit", async (event) => {
   const anchor = room.label ?? room.points[0];
   pushHistory();
   setFurnitureVisible(true);
-  activePlan.plan.furniture.push({
+  const furniture = {
     id: crypto.randomUUID(),
     name,
     roomId: room.id,
@@ -868,7 +874,9 @@ elements.furnitureForm.addEventListener("submit", async (event) => {
     widthCm,
     depthCm,
     quality: "measured",
-  });
+  };
+  if (heightCm !== null) furniture.heightCm = heightCm;
+  activePlan.plan.furniture.push(furniture);
   renderer.render(activePlan);
   renderDeliveryView();
   await persistActivePlan();
@@ -884,6 +892,7 @@ elements.editFurnitureButton.addEventListener("click", () => {
   elements.furnitureName.value = furniture.name;
   elements.furnitureWidth.value = String(furniture.widthCm);
   elements.furnitureDepth.value = String(furniture.depthCm);
+  elements.furnitureHeight.value = Number.isFinite(furniture.heightCm) ? String(furniture.heightCm) : "";
   elements.furnitureRoom.replaceChildren(...activePlan.plan.rooms.map((room) => new Option(room.name, room.id, false, room.id === furniture.roomId)));
   elements.furnitureDialogTitle.textContent = "家具を編集";
   elements.furnitureSubmitButton.textContent = "変更を保存";
