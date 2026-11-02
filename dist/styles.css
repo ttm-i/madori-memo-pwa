@@ -246,6 +246,12 @@ button { color: inherit; touch-action: manipulation; }
 .three-box-kind-washer-pan.three-box-side { filter: none; }
 .three-box-furniture { fill: rgba(183,126,86,.72); stroke: #915f3f; }
 .three-box-side { filter: brightness(.88); }
+.three-kitchen-component.is-interactive { cursor: pointer; }
+.three-kitchen-component-outer { stroke-width: 1.4; vector-effect: non-scaling-stroke; }
+.three-kitchen-sink .three-kitchen-component-outer { fill: #c8d6d8; stroke: #55777c; }
+.three-kitchen-sink-inner { fill: #8faeb2; stroke: #55777c; stroke-width: 1; vector-effect: non-scaling-stroke; }
+.three-kitchen-stove .three-kitchen-component-outer { fill: #4f5552; stroke: #242826; }
+.three-kitchen-burner { fill: none; stroke: #d7d4cb; stroke-width: 1.3; vector-effect: non-scaling-stroke; }
 .three-object-label { pointer-events: none; fill: #333934; font-size: 11px; font-weight: 800; text-anchor: middle; paint-order: stroke; stroke: rgba(255,255,255,.88); stroke-width: 4px; }
 .three-legend { display: flex; flex-wrap: wrap; gap: 10px 15px; padding: 10px 4px 4px; color: var(--muted); font-size: .64rem; }
 .three-legend span { display: inline-flex; align-items: center; gap: 5px; }

@@ -1,4 +1,4 @@
-import { analyzeFurnitureConflicts, analyzeFurniturePlacement, findSupportItem, getDimensionGroup, getElectricalPlanPosition, moveDimensionGuide, QUALITY_LABELS, snapToGrid } from "./model.js?v=56";
+import { analyzeFurnitureConflicts, analyzeFurniturePlacement, buildKitchenComponentRects, findSupportItem, getDimensionGroup, getElectricalPlanPosition, moveDimensionGuide, QUALITY_LABELS, snapToGrid } from "./model.js?v=57";
 
 const NS = "http://www.w3.org/2000/svg";
 
@@ -71,33 +71,6 @@ export function zoomTransformAround(transform, previousAnchor, nextAnchor, facto
 
 export function gestureExceedsTapThreshold(start, current, threshold = 5) {
   return Math.hypot(current.x - start.x, current.y - start.y) >= threshold;
-}
-
-export function buildKitchenComponentRects(feature) {
-  const segments = feature?.horizontalSegmentsCm;
-  const depths = feature?.depthDetailsCm;
-  const required = [feature?.x, feature?.y, feature?.width, segments?.stoveToLeftEdge, segments?.stoveWidth,
-    segments?.sinkWidth, segments?.rightEdgeToSink, depths?.stoveDepth, depths?.stoveToWall,
-    depths?.sinkDepth, depths?.sinkToWall];
-  if (!required.every(Number.isFinite)) return [];
-  return [
-    {
-      kind: "stove",
-      label: "コンロ",
-      x: feature.x + segments.stoveToLeftEdge,
-      y: feature.y + depths.stoveToWall,
-      width: segments.stoveWidth,
-      height: depths.stoveDepth,
-    },
-    {
-      kind: "sink",
-      label: "シンク",
-      x: feature.x + feature.width - segments.rightEdgeToSink - segments.sinkWidth,
-      y: feature.y + depths.sinkToWall,
-      width: segments.sinkWidth,
-      height: depths.sinkDepth,
-    },
-  ];
 }
 
 export class PlanRenderer {

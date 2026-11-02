@@ -69,6 +69,33 @@ export function featureSupportRange(feature) {
   return { bottomCm: 0, topCm: 55, schematic: true };
 }
 
+export function buildKitchenComponentRects(feature) {
+  const segments = feature?.horizontalSegmentsCm;
+  const depths = feature?.depthDetailsCm;
+  const required = [feature?.x, feature?.y, feature?.width, segments?.stoveToLeftEdge, segments?.stoveWidth,
+    segments?.sinkWidth, segments?.rightEdgeToSink, depths?.stoveDepth, depths?.stoveToWall,
+    depths?.sinkDepth, depths?.sinkToWall];
+  if (!required.every(Number.isFinite)) return [];
+  return [
+    {
+      kind: "stove",
+      label: "コンロ",
+      x: feature.x + segments.stoveToLeftEdge,
+      y: feature.y + depths.stoveToWall,
+      width: segments.stoveWidth,
+      height: depths.stoveDepth,
+    },
+    {
+      kind: "sink",
+      label: "シンク",
+      x: feature.x + feature.width - segments.rightEdgeToSink - segments.sinkWidth,
+      y: feature.y + depths.sinkToWall,
+      width: segments.sinkWidth,
+      height: depths.sinkDepth,
+    },
+  ];
+}
+
 export function resolveFurnitureVerticalRange(plan, furniture, visited = new Set()) {
   const ownHeight = Number.isFinite(furniture?.heightCm) ? furniture.heightCm : 35;
   if (!furniture?.supportId || visited.has(furniture.id)) {

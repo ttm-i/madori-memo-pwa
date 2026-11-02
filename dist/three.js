@@ -1,4 +1,4 @@
-import { featureSupportRange, pointInPolygon, resolveFurnitureVerticalRange } from "./model.js?v=56";
+import { buildKitchenComponentRects, featureSupportRange, pointInPolygon, resolveFurnitureVerticalRange } from "./model.js?v=57";
 
 const NS = "http://www.w3.org/2000/svg";
 
@@ -52,6 +52,34 @@ function makeBoxSurfaceInteractive(element, item, onSelect, keyboard = false) {
   element.addEventListener("click", select);
   if (keyboard) element.addEventListener("keydown", (event) => { if (["Enter", " "].includes(event.key)) select(event); });
   return element;
+}
+
+function kitchenComponentElement(component, heightCm, project) {
+  const corners = [
+    { x: component.x, y: component.y },
+    { x: component.x + component.width, y: component.y },
+    { x: component.x + component.width, y: component.y + component.height },
+    { x: component.x, y: component.y + component.height },
+  ];
+  const group = svg("g", { class: `three-kitchen-component three-kitchen-${component.kind}` });
+  group.append(svg("polygon", { class: "three-kitchen-component-outer", points: pointsValue(corners.map((point) => project(point, heightCm))) }));
+  if (component.kind === "sink") {
+    const inset = Math.min(5, component.width / 6, component.height / 6);
+    const inner = [
+      { x: component.x + inset, y: component.y + inset },
+      { x: component.x + component.width - inset, y: component.y + inset },
+      { x: component.x + component.width - inset, y: component.y + component.height - inset },
+      { x: component.x + inset, y: component.y + component.height - inset },
+    ];
+    group.append(svg("polygon", { class: "three-kitchen-sink-inner", points: pointsValue(inner.map((point) => project(point, heightCm + .2))) }));
+  } else {
+    const burnerCenters = [[.3, .3], [.7, .3], [.3, .7], [.7, .7]];
+    for (const [xRatio, yRatio] of burnerCenters) {
+      const center = project({ x: component.x + component.width * xRatio, y: component.y + component.height * yRatio }, heightCm + .2);
+      group.append(svg("circle", { class: "three-kitchen-burner", cx: center.x, cy: center.y, r: 3.2 }));
+    }
+  }
+  return group;
 }
 
 export function threeItemBelongsToRoom(item, roomId) {
@@ -245,6 +273,7 @@ export function renderThreeView(canvas, documentData, options = {}, onSelect = n
   const sceneLayer = svg("g", { class: "three-scene-layer" });
   const labelLayer = svg("g", { class: "three-label-layer" });
   const surfaces = [];
+  let kitchenComponentCount = 0;
   let hiddenWallCount = 0;
   const cutOpeningIds = new Set();
   for (const room of displayRooms) {
@@ -365,6 +394,13 @@ export function renderThreeView(canvas, documentData, options = {}, onSelect = n
     const baseDepth = depthBase.reduce((sum, point) => sum + point.y, 0) / depthBase.length;
     const topSurface = svg("polygon", { class: `${className} three-box-top`, points: pointsValue(top) });
     surfaces.push({ depth: baseDepth, order: 3, element: makeBoxSurfaceInteractive(topSurface, item, onSelect, true) });
+    if (item.type === "feature" && item.kind === "kitchen") {
+      for (const component of buildKitchenComponentRects(item)) {
+        const element = kitchenComponentElement(component, item.vertical.topCm + .8, project);
+        surfaces.push({ depth: baseDepth, order: 4, element: makeBoxSurfaceInteractive(element, item, onSelect) });
+        kitchenComponentCount += 1;
+      }
+    }
     if (showLabels) {
       const center = project({ x: item.x + item.width / 2, y: item.y + item.depth / 2 }, item.vertical.topCm + 8);
       labelLayer.append(svg("text", { class: "three-object-label", x: center.x, y: center.y }, item.name));
@@ -382,5 +418,6 @@ export function renderThreeView(canvas, documentData, options = {}, onSelect = n
     partitionWallCount: partitionWalls.length,
     furnitureWithoutHeight: furnitureItems.filter((item) => !Number.isFinite(item.heightCm)).length,
     selectedRoomName: selectedRoom?.name ?? null,
+    kitchenComponentCount,
   };
 }
