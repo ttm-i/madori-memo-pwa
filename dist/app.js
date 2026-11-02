@@ -1,7 +1,7 @@
-import { deleteActivePlan, loadActivePlan, saveActivePlan } from "./db.js?v=62";
-import { alignFurnitureToSupport, alignSupportedFurniture, analyzeDeliveryRoute, analyzeFurnitureConflicts, analyzeFurniturePlacement, buildElevationItems, buildRoomWalls, buildWallDiagram, countQualities, createSamplePlan, DIMENSION_GROUP_LABELS, duplicateFurniture, findSupportItem, getDimensionGroup, getElectricalPlanPosition, resolveFurnitureVerticalRange, rotateFurniture, updateFurniture, validatePlan, wallDisplayWidth } from "./model.js?v=62";
-import { detailMarkup, measurementMetrics, PlanRenderer } from "./renderer.js?v=62";
-import { renderThreeView, threeViewportBox } from "./three.js?v=62";
+import { deleteActivePlan, loadActivePlan, saveActivePlan } from "./db.js?v=63";
+import { alignFurnitureToSupport, alignSupportedFurniture, analyzeDeliveryRoute, analyzeFurnitureConflicts, analyzeFurniturePlacement, buildElevationItems, buildRoomWalls, buildWallDiagram, countQualities, createSamplePlan, DIMENSION_GROUP_LABELS, duplicateFurniture, findSupportItem, getDimensionGroup, getElectricalPlanPosition, resolveFurnitureVerticalRange, rotateFurniture, updateFurniture, validatePlan, wallDisplayWidth } from "./model.js?v=63";
+import { detailMarkup, measurementMetrics, PlanRenderer } from "./renderer.js?v=63";
+import { createWebGLThreeView } from "./webgl-three.js?v=63";
 
 const elements = Object.fromEntries([
   "menuButton", "dataMenu", "detailDialog", "detailType", "detailTitle", "detailBody", "fileInput",
@@ -47,9 +47,7 @@ let threeQuarterTurn = 0;
 let threeCutaway = true;
 let threeShowLabels = false;
 let threeRoomId = "";
-let threeViewport = { scale: 1, panX: 0, panY: 0 };
-let threePanGesture = null;
-let suppressThreeClick = false;
+let webglThreeView = null;
 const threeLayers = { walls: true, openings: true, features: true, furniture: true };
 const selectableByMode = {
   view: new Set(["room", "dimension", "equipment", "electrical", "furniture"]),
@@ -69,14 +67,15 @@ function updateThreeView() {
     elements.threeHeightNote.textContent = "";
     return;
   }
-  const result = renderThreeView(elements.threeCanvas, activePlan, {
+  webglThreeView ??= createWebGLThreeView(elements.threeCanvas, (type, item) => showDetail(type, item));
+  const result = webglThreeView.render(activePlan, {
     quarterTurn: threeQuarterTurn,
     cutaway: threeCutaway,
     showLabels: threeShowLabels,
     roomId: threeRoomId || null,
     ...threeLayers,
-  }, (type, item) => showDetail(type, item));
-  applyThreeViewport();
+  });
+  syncThreeZoomControls();
   const scope = result.selectedRoomName ? `${result.selectedRoomName}を表示中。` : "全体を表示中。";
   const notes = [`${scope} ドア・窓 ${result.openingCount}点のうち ${result.cutOpeningCount}点を壁の開口として反映。間仕切り壁 ${result.partitionWallCount}点。壁上端は天井位置ではありません。`];
   notes.push(result.furnitureWithoutHeight
@@ -85,27 +84,23 @@ function updateThreeView() {
   elements.threeHeightNote.textContent = notes.join(" ");
 }
 
-function applyThreeViewport() {
-  const viewport = threeViewportBox(threeViewport);
-  threeViewport = { scale: viewport.scale, panX: viewport.panX, panY: viewport.panY };
-  elements.threeCanvas.setAttribute("viewBox", `${viewport.x} ${viewport.y} ${viewport.width} ${viewport.height}`);
-  const zoomed = viewport.scale > 1.001;
-  elements.threeCanvas.classList.toggle("is-zoomed", zoomed);
-  elements.threeZoomValue.textContent = `${Math.round(viewport.scale * 100)}%`;
+function syncThreeZoomControls() {
+  const scale = webglThreeView?.getZoom() ?? 1;
+  const zoomed = scale > 1.001;
+  elements.threeZoomValue.textContent = `${Math.round(scale * 100)}%`;
   elements.threeZoomOut.disabled = !zoomed;
-  elements.threeZoomIn.disabled = viewport.scale >= 3;
+  elements.threeZoomIn.disabled = scale >= 3;
   elements.threeZoomHint.hidden = !zoomed;
 }
 
 function setThreeZoom(scale) {
-  threeViewport.scale = Math.max(1, Math.min(3, scale));
-  if (threeViewport.scale === 1) Object.assign(threeViewport, { panX: 0, panY: 0 });
-  applyThreeViewport();
+  webglThreeView?.setZoom(scale);
+  syncThreeZoomControls();
 }
 
 function resetThreeViewport() {
-  threeViewport = { scale: 1, panX: 0, panY: 0 };
-  applyThreeViewport();
+  webglThreeView?.resetView(threeQuarterTurn);
+  syncThreeZoomControls();
 }
 
 function updateThreeRoomFilter() {
@@ -891,40 +886,9 @@ for (const [toggle, layer] of [
   [elements.threeFurnitureToggle, "furniture"],
 ]) toggle.addEventListener("change", () => { threeLayers[layer] = toggle.checked; updateThreeView(); });
 
-elements.threeZoomOut.addEventListener("click", () => setThreeZoom(threeViewport.scale - .25));
-elements.threeZoomIn.addEventListener("click", () => setThreeZoom(threeViewport.scale + .25));
+elements.threeZoomOut.addEventListener("click", () => setThreeZoom((webglThreeView?.getZoom() ?? 1) - .25));
+elements.threeZoomIn.addEventListener("click", () => setThreeZoom((webglThreeView?.getZoom() ?? 1) + .25));
 elements.threeZoomReset.addEventListener("click", resetThreeViewport);
-elements.threeCanvas.addEventListener("pointerdown", (event) => {
-  if (threeViewport.scale <= 1 || !event.isPrimary) return;
-  const rect = elements.threeCanvas.getBoundingClientRect();
-  threePanGesture = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, panX: threeViewport.panX, panY: threeViewport.panY, moved: false, unitsPerPixel: (900 / threeViewport.scale) / Math.max(1, rect.width) };
-  elements.threeCanvas.setPointerCapture(event.pointerId);
-});
-elements.threeCanvas.addEventListener("pointermove", (event) => {
-  if (!threePanGesture || event.pointerId !== threePanGesture.pointerId) return;
-  const dx = event.clientX - threePanGesture.x;
-  const dy = event.clientY - threePanGesture.y;
-  if (!threePanGesture.moved && Math.hypot(dx, dy) < 5) return;
-  threePanGesture.moved = true;
-  threeViewport.panX = threePanGesture.panX - dx * threePanGesture.unitsPerPixel;
-  threeViewport.panY = threePanGesture.panY - dy * threePanGesture.unitsPerPixel;
-  applyThreeViewport();
-  event.preventDefault();
-});
-function endThreePan(event) {
-  if (!threePanGesture || event.pointerId !== threePanGesture.pointerId) return;
-  suppressThreeClick = threePanGesture.moved;
-  threePanGesture = null;
-  if (elements.threeCanvas.hasPointerCapture(event.pointerId)) elements.threeCanvas.releasePointerCapture(event.pointerId);
-  setTimeout(() => { suppressThreeClick = false; }, 0);
-}
-elements.threeCanvas.addEventListener("pointerup", endThreePan);
-elements.threeCanvas.addEventListener("pointercancel", endThreePan);
-elements.threeCanvas.addEventListener("click", (event) => {
-  if (!suppressThreeClick) return;
-  event.preventDefault();
-  event.stopImmediatePropagation();
-}, true);
 
 elements.wallDiagramModeButton.addEventListener("click", () => setWallDisplayMode("diagram"));
 elements.wallHeightModeButton.addEventListener("click", () => setWallDisplayMode("height"));

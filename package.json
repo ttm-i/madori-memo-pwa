@@ -2,6 +2,9 @@
   "name": "floor-plan-pwa",
   "private": true,
   "type": "module",
+  "dependencies": {
+    "three": "0.187.0"
+  },
   "scripts": {
     "check": "node --test && node scripts/check-public-boundary.mjs"
   }

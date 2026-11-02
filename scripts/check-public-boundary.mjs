@@ -26,6 +26,10 @@ const allowedFiles = new Set([
   "styles.css",
   "sw.js",
   "three.js",
+  "webgl-three.js",
+  "vendor/three/LICENSE",
+  "vendor/three/three.core.js",
+  "vendor/three/three.module.js",
 ]);
 
 async function walk(directory) {
@@ -44,7 +48,7 @@ const matches = [];
 const files = await walk(dist);
 for (const file of files) {
   const publicPath = relative(dist, file).replaceAll("\\", "/");
-  if (publicPath.includes("/") || !allowedFiles.has(basename(file))) {
+  if (!allowedFiles.has(publicPath)) {
     matches.push(`${publicPath}: 公開許可リストにないファイル`);
   }
   if (!textExtensions.has(extname(file))) continue;

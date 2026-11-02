@@ -1,7 +1,7 @@
 {
-  "name": "間取りメモ",
-  "short_name": "間取り",
-  "description": "間取りと家具寸法を端末内だけで確認するオフラインPWA",
+  "name": "間取りメモ WebGL試作版",
+  "short_name": "間取り3D",
+  "description": "端末内だけで間取りと家具を確認する無料のWebGL試作PWA",
   "lang": "ja",
   "start_url": "./",
   "scope": "./",

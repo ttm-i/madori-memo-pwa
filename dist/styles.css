@@ -223,9 +223,8 @@ button { color: inherit; touch-action: manipulation; }
 .three-options label { display: inline-flex; align-items: center; gap: 6px; }
 .three-options input { accent-color: var(--accent); }
 .three-canvas-frame { position: relative; overflow: hidden; border: 1px solid var(--line); border-radius: 20px; background: linear-gradient(#f7f4ec,#e8e4da); box-shadow: inset 0 1px 0 rgba(255,255,255,.8); }
-#threeCanvas { display: block; width: 100%; height: auto; min-height: 430px; }
-#threeCanvas.is-zoomed { cursor: grab; touch-action: none; }
-#threeCanvas.is-zoomed:active { cursor: grabbing; }
+#threeCanvas { display: block; width: 100%; height: min(68vh, 620px); min-height: 430px; touch-action: none; cursor: grab; }
+#threeCanvas:active { cursor: grabbing; }
 .three-viewport-controls { position: absolute; z-index: 3; top: 10px; right: 10px; display: grid; grid-template-columns: 34px 54px 34px; overflow: hidden; border: 1px solid var(--line); border-radius: 11px; background: rgba(255,255,255,.9); box-shadow: 0 3px 12px rgba(55,51,43,.12); }
 .three-viewport-controls button { min-height: 34px; padding: 0; border: 0; border-right: 1px solid var(--line); background: transparent; color: var(--accent); font-size: 1rem; font-weight: 800; }
 .three-viewport-controls button:last-child { border-right: 0; }

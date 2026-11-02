@@ -1,4 +1,5 @@
-const DB_NAME = "floor-plan-private";
+// WebGL試作版は確定版とは別領域に保存し、実験中の変更を通常版へ波及させない。
+const DB_NAME = "floor-plan-webgl-private";
 const DB_VERSION = 1;
 const STORE_NAME = "documents";
 const ACTIVE_KEY = "active-plan";
