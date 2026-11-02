@@ -1,4 +1,4 @@
-import { buildKitchenComponentRects, featureSupportRange, pointInPolygon, resolveFurnitureVerticalRange } from "./model.js?v=60";
+import { buildKitchenComponentRects, featureSupportRange, pointInPolygon, resolveFurnitureVerticalRange } from "./model.js?v=61";
 
 const NS = "http://www.w3.org/2000/svg";
 

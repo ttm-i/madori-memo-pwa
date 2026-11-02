@@ -1,7 +1,7 @@
-import { deleteActivePlan, loadActivePlan, saveActivePlan } from "./db.js?v=60";
-import { alignFurnitureToSupport, alignSupportedFurniture, analyzeDeliveryRoute, analyzeFurnitureConflicts, analyzeFurniturePlacement, buildElevationItems, buildRoomWalls, buildWallDiagram, countQualities, createSamplePlan, DIMENSION_GROUP_LABELS, duplicateFurniture, findSupportItem, getDimensionGroup, getElectricalPlanPosition, resolveFurnitureVerticalRange, rotateFurniture, updateFurniture, validatePlan, wallDisplayWidth } from "./model.js?v=60";
-import { detailMarkup, measurementMetrics, PlanRenderer } from "./renderer.js?v=60";
-import { renderThreeView, threeViewportBox } from "./three.js?v=60";
+import { deleteActivePlan, loadActivePlan, saveActivePlan } from "./db.js?v=61";
+import { alignFurnitureToSupport, alignSupportedFurniture, analyzeDeliveryRoute, analyzeFurnitureConflicts, analyzeFurniturePlacement, buildElevationItems, buildRoomWalls, buildWallDiagram, countQualities, createSamplePlan, DIMENSION_GROUP_LABELS, duplicateFurniture, findSupportItem, getDimensionGroup, getElectricalPlanPosition, resolveFurnitureVerticalRange, rotateFurniture, updateFurniture, validatePlan, wallDisplayWidth } from "./model.js?v=61";
+import { detailMarkup, measurementMetrics, PlanRenderer } from "./renderer.js?v=61";
+import { renderThreeView, threeViewportBox } from "./three.js?v=61";
 
 const elements = Object.fromEntries([
   "menuButton", "dataMenu", "detailDialog", "detailType", "detailTitle", "detailBody", "fileInput",
@@ -57,6 +57,8 @@ const selectableByMode = {
 };
 const history = [];
 const renderer = new PlanRenderer(elements.planCanvas, elements.viewportLayer, showDetail, handleFurnitureEvent, handleViewChange, handleMeasurementChange);
+let persistQueue = Promise.resolve();
+let latestPersistTask = persistQueue;
 
 function updateThreeView() {
   elements.threeEmpty.hidden = Boolean(activePlan);
@@ -146,10 +148,30 @@ function pushHistory() {
   updateUndoButton();
 }
 
-async function persistActivePlan() {
+function persistActivePlan() {
+  const snapshot = structuredClone(activePlan);
   elements.saveStatus.textContent = "保存中…";
-  await saveActivePlan(activePlan);
-  elements.saveStatus.textContent = "端末内に保存済み";
+  const task = persistQueue.then(() => saveActivePlan(snapshot));
+  persistQueue = task.catch(() => {});
+  latestPersistTask = task;
+  return task.then(() => {
+    if (latestPersistTask === task) elements.saveStatus.textContent = "端末内に保存済み";
+    return true;
+  }, () => {
+    if (latestPersistTask === task) {
+      elements.saveStatus.textContent = "保存できませんでした";
+      showToast("端末内への保存に失敗しました");
+    }
+    return false;
+  });
+}
+
+async function waitForPendingSaves() {
+  let observed;
+  do {
+    observed = persistQueue;
+    await observed;
+  } while (observed !== persistQueue);
 }
 
 function handleFurnitureEvent(stage) {
@@ -1191,9 +1213,11 @@ loadActivePlan().then((plan) => {
 
 if ("serviceWorker" in navigator) {
   let reloadingForUpdate = false;
-  navigator.serviceWorker.addEventListener("controllerchange", () => {
+  navigator.serviceWorker.addEventListener("controllerchange", async () => {
     if (reloadingForUpdate) return;
     reloadingForUpdate = true;
+    elements.saveStatus.textContent = "保存を確認して更新中…";
+    await waitForPendingSaves();
     window.location.reload();
   });
   window.addEventListener("load", () => navigator.serviceWorker.register("./sw.js")

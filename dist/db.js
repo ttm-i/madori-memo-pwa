@@ -22,10 +22,24 @@ async function transaction(mode, operation) {
     const tx = db.transaction(STORE_NAME, mode);
     const store = tx.objectStore(STORE_NAME);
     const request = operation(store);
-    request.onsuccess = () => resolve(request.result ?? null);
-    request.onerror = () => reject(request.error);
-    tx.oncomplete = () => db.close();
-    tx.onerror = () => reject(tx.error);
+    let result = null;
+    let settled = false;
+    const fail = (error) => {
+      if (settled) return;
+      settled = true;
+      db.close();
+      reject(error);
+    };
+    request.onsuccess = () => { result = request.result ?? null; };
+    request.onerror = () => fail(request.error);
+    tx.oncomplete = () => {
+      if (settled) return;
+      settled = true;
+      db.close();
+      resolve(result);
+    };
+    tx.onerror = () => fail(tx.error);
+    tx.onabort = () => fail(tx.error ?? new Error("IndexedDB transaction aborted"));
   });
 }
 
