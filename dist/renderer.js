@@ -1,4 +1,4 @@
-import { analyzeFurnitureConflicts, analyzeFurniturePlacement, findSupportItem, getDimensionGroup, getElectricalPlanPosition, moveDimensionGuide, QUALITY_LABELS, snapToGrid } from "./model.js?v=55";
+import { analyzeFurnitureConflicts, analyzeFurniturePlacement, findSupportItem, getDimensionGroup, getElectricalPlanPosition, moveDimensionGuide, QUALITY_LABELS, snapToGrid } from "./model.js?v=56";
 
 const NS = "http://www.w3.org/2000/svg";
 
@@ -39,7 +39,10 @@ export function snapMeasurementPoint(point, documentData, thresholdCm = 15) {
   };
   for (const room of documentData.plan.rooms ?? []) addPolygon(room.points);
   for (const opening of documentData.plan.openings ?? []) if (opening.from && opening.to) segments.push([opening.from, opening.to]);
-  for (const wall of documentData.plan.walls ?? []) if (wall.from && wall.to) segments.push([wall.from, wall.to]);
+  for (const wall of documentData.plan.walls ?? []) {
+    if (wall.from && wall.to) segments.push([wall.from, wall.to]);
+    if (wall.points?.length >= 3) wall.points.forEach((point, index) => segments.push([point, wall.points[(index + 1) % wall.points.length]]));
+  }
   for (const feature of documentData.plan.features ?? []) addRectangle(feature, feature.width, feature.height);
   for (const furniture of documentData.plan.furniture ?? []) addRectangle(furniture, furniture.widthCm, furniture.depthCm);
   let closest = { ...point };
@@ -169,14 +172,21 @@ export class PlanRenderer {
     }
 
     for (const wall of documentData.plan.walls ?? []) {
-      content.append(svg("line", {
-        class: `wall-line ${wall.uncertain ? "uncertain" : ""}`,
-        x1: wall.from.x,
-        y1: wall.from.y,
-        x2: wall.to.x,
-        y2: wall.to.y,
-        "stroke-width": wall.thicknessCm ?? 10,
-      }));
+      if (wall.points?.length >= 3) {
+        content.append(svg("polygon", {
+          class: `wall-area ${wall.uncertain ? "uncertain" : ""}`,
+          points: pointsValue(wall.points),
+        }));
+      } else if (wall.from && wall.to) {
+        content.append(svg("line", {
+          class: `wall-line ${wall.uncertain ? "uncertain" : ""}`,
+          x1: wall.from.x,
+          y1: wall.from.y,
+          x2: wall.to.x,
+          y2: wall.to.y,
+          "stroke-width": wall.thicknessCm ?? 10,
+        }));
+      }
     }
 
     for (const opening of documentData.plan.openings ?? []) {

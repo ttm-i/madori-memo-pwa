@@ -1,4 +1,4 @@
-import { featureSupportRange, pointInPolygon, resolveFurnitureVerticalRange } from "./model.js?v=55";
+import { featureSupportRange, pointInPolygon, resolveFurnitureVerticalRange } from "./model.js?v=56";
 
 const NS = "http://www.w3.org/2000/svg";
 
@@ -72,6 +72,7 @@ export function threeRoomBounds(rooms, fallback = { x: 0, y: 0, width: 1, height
 export function threeWallBelongsToRoom(wall, room) {
   if (!room) return true;
   if (wall?.roomId || wall?.roomIds) return threeItemBelongsToRoom(wall, room.id);
+  if (wall?.points?.length >= 3) return wall.points.some((point) => pointInPolygon(point, room.points));
   if (!wall?.from || !wall?.to) return false;
   const midpoint = { x: (wall.from.x + wall.to.x) / 2, y: (wall.from.y + wall.to.y) / 2 };
   return [wall.from, midpoint, wall.to].some((point) => pointInPolygon(point, room.points));
@@ -227,7 +228,7 @@ export function renderThreeView(canvas, documentData, options = {}, onSelect = n
     .filter((item) => item.kind !== "column" && threeItemBelongsToRoom(item, selectedRoom?.id))
     .map((item) => ({ ...item, depth: item.height, vertical: featureVerticalRange(item), type: "feature" }));
   const furnitureItems = (plan.furniture ?? []).filter((item) => threeItemBelongsToRoom(item, selectedRoom?.id));
-  const partitionWalls = (plan.walls ?? []).filter((wall) => wall.from && wall.to && threeWallBelongsToRoom(wall, selectedRoom));
+  const partitionWalls = (plan.walls ?? []).filter((wall) => (wall.points?.length >= 3 || (wall.from && wall.to)) && threeWallBelongsToRoom(wall, selectedRoom));
   const wallDisplayHeight = Math.max(220, ...drawableOpenings.map((item) => item.range.topCm + 20), ...featureItems.map((item) => item.vertical.topCm + 10));
   const projectedBounds = [
     { x: bounds.x, y: bounds.y }, { x: bounds.x + bounds.width, y: bounds.y },
@@ -278,6 +279,33 @@ export function renderThreeView(canvas, documentData, options = {}, onSelect = n
   }
   for (const wall of partitionWalls) {
     if (!showWalls) break;
+    if (wall.points?.length >= 3) {
+      wall.points.forEach((from, index) => {
+        const to = wall.points[(index + 1) % wall.points.length];
+        for (const segment of subdivideWallSegment(from, to)) {
+          const bottomA = project(segment.from); const bottomB = project(segment.to);
+          const topA = project(segment.from, wallDisplayHeight); const topB = project(segment.to, wallDisplayHeight);
+          surfaces.push({
+            depth: (bottomA.y + bottomB.y) / 2,
+            order: .5,
+            element: wallStripElement([bottomA, bottomB, topB, topA], {
+              first: segment.stripIndex === 0,
+              last: segment.stripIndex === segment.stripCount - 1,
+              partition: true,
+              wallId: wall.id ?? "",
+            }),
+          });
+        }
+      });
+      const base = wall.points.map((point) => project(point));
+      const top = wall.points.map((point) => project(point, wallDisplayHeight));
+      surfaces.push({
+        depth: base.reduce((sum, point) => sum + point.y, 0) / base.length,
+        order: .75,
+        element: svg("polygon", { class: "three-wall three-partition-wall three-wall-volume-top", points: pointsValue(top), "data-wall-id": wall.id ?? "" }),
+      });
+      continue;
+    }
     if (!wall.from || !wall.to) continue;
     for (const segment of subdivideWallSegment(wall.from, wall.to)) {
       const bottomA = project(segment.from); const bottomB = project(segment.to);

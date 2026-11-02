@@ -563,6 +563,26 @@ export function rectanglesOverlap(first, second, epsilon = 0.001) {
     && first.y < secondBottom - epsilon && firstBottom > second.y + epsilon;
 }
 
+export function rectangleIntersectsPolygon(rectangle, points, epsilon = 0.001) {
+  if (!Array.isArray(points) || points.length < 3) return false;
+  const left = rectangle.x + epsilon;
+  const right = rectangle.x + (rectangle.widthCm ?? rectangle.width) - epsilon;
+  const top = rectangle.y + epsilon;
+  const bottom = rectangle.y + (rectangle.depthCm ?? rectangle.height) - epsilon;
+  if (!(right > left && bottom > top)) return false;
+  const corners = [{ x: left, y: top }, { x: right, y: top }, { x: right, y: bottom }, { x: left, y: bottom }];
+  if (corners.some((corner) => pointInPolygon(corner, points))) return true;
+  if (points.some((point) => point.x > left && point.x < right && point.y > top && point.y < bottom)) return true;
+  const rectangleEdges = corners.map((point, index) => [point, corners[(index + 1) % corners.length]]);
+  const orientation = (a, b, c) => (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+  const crosses = (a, b, c, d) => orientation(a, b, c) * orientation(a, b, d) < -epsilon
+    && orientation(c, d, a) * orientation(c, d, b) < -epsilon;
+  return points.some((from, index) => {
+    const to = points[(index + 1) % points.length];
+    return rectangleEdges.some(([a, b]) => crosses(from, to, a, b));
+  });
+}
+
 function wallBounds(wall) {
   const thickness = wall.thicknessCm ?? 10;
   return {
@@ -585,7 +605,10 @@ export function analyzeFurnitureConflicts(furniture, plan) {
     if (overlapsVertically(featureSupportRange(feature)) && rectanglesOverlap(furniture, feature)) conflicts.push({ type: "feature", id: feature.id, name: feature.name });
   }
   for (const wall of plan.walls ?? []) {
-    if (rectanglesOverlap(furniture, wallBounds(wall))) conflicts.push({ type: "wall", id: wall.id, name: wall.name });
+    const overlaps = wall.points?.length >= 3
+      ? rectangleIntersectsPolygon(furniture, wall.points)
+      : wall.from && wall.to && rectanglesOverlap(furniture, wallBounds(wall));
+    if (overlaps) conflicts.push({ type: "wall", id: wall.id, name: wall.name });
   }
   return conflicts;
 }

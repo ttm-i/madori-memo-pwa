@@ -345,6 +345,8 @@ dialog::backdrop { background: rgba(32,36,31,.42); backdrop-filter: blur(2px); }
 .electrical-marker:hover .electrical-symbol, .electrical-marker:focus .electrical-symbol { stroke-width: 4; }
 .wall-line { fill: none; stroke: #303531; stroke-linecap: square; vector-effect: non-scaling-stroke; }
 .wall-line.uncertain { stroke: var(--warning); stroke-dasharray: 7 5; }
+.wall-area { fill: #303531; stroke: #303531; stroke-width: 1; vector-effect: non-scaling-stroke; }
+.wall-area.uncertain { stroke: var(--warning); stroke-dasharray: 7 5; }
 .furniture-group { cursor: pointer; }
 .furniture-shape { fill: #d7a86e; fill-opacity: .9; stroke: #6f4728; stroke-width: 2.5; vector-effect: non-scaling-stroke; }
 .furniture-label { fill: #3e2c1d; font-size: 13px; font-weight: 750; text-anchor: middle; dominant-baseline: middle; pointer-events: none; }

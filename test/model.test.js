@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { alignFurnitureToSupport, analyzeDeliveryRoute, analyzeFurnitureConflicts, analyzeFurniturePlacement, buildElevationItems, buildRoomWalls, buildWallDiagram, countQualities, createSamplePlan, duplicateFurniture, findDeliveryDoorPath, fitsRectangle, FORMAT, getDimensionGroup, getElectricalPlanPosition, moveDimensionGuide, pointInPolygon, rectanglesOverlap, resolveFurnitureElevationPlacement, resolveFurnitureVerticalRange, rotateFurniture, snapToGrid, updateFurniture, validatePlan, wallDisplayWidth } from "../dist/model.js";
+import { alignFurnitureToSupport, analyzeDeliveryRoute, analyzeFurnitureConflicts, analyzeFurniturePlacement, buildElevationItems, buildRoomWalls, buildWallDiagram, countQualities, createSamplePlan, duplicateFurniture, findDeliveryDoorPath, fitsRectangle, FORMAT, getDimensionGroup, getElectricalPlanPosition, moveDimensionGuide, pointInPolygon, rectangleIntersectsPolygon, rectanglesOverlap, resolveFurnitureElevationPlacement, resolveFurnitureVerticalRange, rotateFurniture, snapToGrid, updateFurniture, validatePlan, wallDisplayWidth } from "../dist/model.js";
 import { buildKitchenComponentRects, detailMarkup, gestureExceedsTapThreshold, measurementMetrics, PlanRenderer, snapMeasurementPoint, zoomTransformAround } from "../dist/renderer.js";
 import { featureVerticalRange, isCutawayEdge, openingVerticalRange, projectThreePoint, splitWallFace, subdivideWallRectangle, subdivideWallSegment, threeItemBelongsToRoom, threeLayerEnabled, threeRoomBounds, threeSelectableType, threeWallBelongsToRoom, visibleBoxSideIndexes } from "../dist/three.js";
 
@@ -272,6 +272,14 @@ test("touching furniture edges are not treated as overlap", () => {
   ), false);
 });
 
+test("polygon walls preserve a recessed counter niche in conflict checks", () => {
+  const wall = [{ x: 164.5, y: 621 }, { x: 203, y: 621 }, { x: 203, y: 656 }, { x: 171.5, y: 656 }, { x: 171.5, y: 738.5 }, { x: 164.5, y: 738.5 }];
+  assert.equal(rectangleIntersectsPolygon({ x: 180, y: 670, widthCm: 10, depthCm: 10 }, wall), false);
+  assert.equal(rectangleIntersectsPolygon({ x: 165, y: 670, widthCm: 4, depthCm: 10 }, wall), true);
+  assert.equal(rectangleIntersectsPolygon({ x: 180, y: 630, widthCm: 10, depthCm: 10 }, wall), true);
+  assert.equal(rectangleIntersectsPolygon({ x: 171.5, y: 670, widthCm: 8, depthCm: 10 }, wall), false);
+});
+
 test("dimension groups are inferred from stable ids and allow explicit overrides", () => {
   assert.equal(getDimensionGroup({ id: "hall-left-2" }), "wet");
   assert.equal(getDimensionGroup({ id: "hall-right-1" }), "hall");
@@ -369,6 +377,7 @@ test("3D room focus retains unassigned partition walls inside the room", () => {
   const room = { id: "ldk", points: [{ x: 0, y: 0 }, { x: 200, y: 0 }, { x: 200, y: 200 }, { x: 0, y: 200 }] };
   assert.equal(threeWallBelongsToRoom({ from: { x: 50, y: 50 }, to: { x: 150, y: 50 } }, room), true);
   assert.equal(threeWallBelongsToRoom({ from: { x: 250, y: 50 }, to: { x: 300, y: 50 } }, room), false);
+  assert.equal(threeWallBelongsToRoom({ points: [{ x: 20, y: 20 }, { x: 40, y: 20 }, { x: 40, y: 40 }] }, room), true);
 });
 
 test("3D boxes choose the two front faces after every rotation", () => {
