@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { analyzeDeliveryRoute, analyzeFurnitureConflicts, analyzeFurniturePlacement, buildElevationItems, buildRoomWalls, buildWallDiagram, countQualities, createSamplePlan, duplicateFurniture, findDeliveryDoorPath, fitsRectangle, FORMAT, getDimensionGroup, getElectricalPlanPosition, moveDimensionGuide, pointInPolygon, rectanglesOverlap, rotateFurniture, snapToGrid, updateFurniture, validatePlan, wallDisplayWidth } from "../dist/model.js";
-import { buildKitchenComponentRects, detailMarkup, measurementMetrics, snapMeasurementPoint, zoomTransformAround } from "../dist/renderer.js";
+import { buildKitchenComponentRects, detailMarkup, measurementMetrics, PlanRenderer, snapMeasurementPoint, zoomTransformAround } from "../dist/renderer.js";
 
 test("sample plan conforms to the public schema", () => {
   const sample = createSamplePlan();
@@ -187,6 +187,40 @@ test("temporary measurement reports direct and axis distances and snaps to plan 
   const sample = createSamplePlan();
   assert.deepEqual(snapMeasurementPoint({ x: 100, y: 64 }, sample, 10), { x: 100, y: 60 });
   assert.deepEqual(snapMeasurementPoint({ x: 400, y: 400 }, sample, 5), { x: 400, y: 400 });
+});
+
+test("a second pointer cancels measurement input and becomes a pinch gesture", () => {
+  const renderer = Object.create(PlanRenderer.prototype);
+  const previousMeasurement = { from: { x: 10, y: 20 }, to: { x: 30, y: 40 } };
+  renderer.measurement = { from: { x: 90, y: 100 }, to: null };
+  renderer.measurementPointer = {
+    pointerId: 1,
+    clientX: 100,
+    clientY: 120,
+    lastClientX: 105,
+    lastClientY: 125,
+    measurementBefore: previousMeasurement,
+  };
+  renderer.draggingMeasurement = null;
+  renderer.pointers = new Map();
+  let overlayUpdates = 0;
+  renderer.updateMeasurementOverlay = () => { overlayUpdates += 1; };
+  let prevented = false;
+  let captured = null;
+  const promoted = renderer.promoteMeasurementGestureToPinch({
+    pointerId: 2,
+    clientX: 220,
+    clientY: 240,
+    preventDefault: () => { prevented = true; },
+    currentTarget: { setPointerCapture: (pointerId) => { captured = pointerId; } },
+  });
+  assert.equal(promoted, true);
+  assert.equal(prevented, true);
+  assert.equal(captured, 2);
+  assert.deepEqual(renderer.measurement, previousMeasurement);
+  assert.deepEqual([...renderer.pointers.entries()], [[1, { x: 105, y: 125 }], [2, { x: 220, y: 240 }]]);
+  assert.equal(renderer.measurementPointer, null);
+  assert.equal(overlayUpdates, 1);
 });
 
 test("furniture placement reports wall clearances inside a room", () => {

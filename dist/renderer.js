@@ -1,4 +1,4 @@
-import { analyzeFurnitureConflicts, analyzeFurniturePlacement, getDimensionGroup, getElectricalPlanPosition, moveDimensionGuide, QUALITY_LABELS, snapToGrid } from "./model.js?v=36";
+import { analyzeFurnitureConflicts, analyzeFurniturePlacement, getDimensionGroup, getElectricalPlanPosition, moveDimensionGuide, QUALITY_LABELS, snapToGrid } from "./model.js?v=37";
 
 const NS = "http://www.w3.org/2000/svg";
 
@@ -366,16 +366,35 @@ export class PlanRenderer {
     const { from, to } = this.measurement;
     if (!from) return group;
     const makeHandle = (key, point) => {
-      const handle = svg("g", { class: "measurement-handle", role: "button", tabindex: 0, "aria-label": key === "from" ? "測定の始点" : "測定の終点" });
+      const isActive = this.draggingMeasurement?.key === key
+        || (this.measurementPointer?.action === key && (key === "from" || to));
+      const handle = svg("g", {
+        class: `measurement-handle measurement-handle-${key}${isActive ? " is-active" : ""}`,
+        role: "button",
+        tabindex: 0,
+        "aria-label": key === "from" ? "測定の始点" : "測定の終点",
+      });
       handle.append(
         svg("circle", { class: "measurement-handle-hit", cx: point.x, cy: point.y, r: 24 }),
-        svg("circle", { class: "measurement-handle-dot", cx: point.x, cy: point.y, r: 7 }),
+        svg("circle", { class: "measurement-handle-dot", cx: point.x, cy: point.y, r: isActive ? 7 : 4 }),
+        svg("text", { class: "measurement-handle-label", x: point.x + 10, y: point.y - 9 }, key === "from" ? "始" : "終"),
       );
       handle.addEventListener("pointerdown", (event) => {
         event.preventDefault();
         event.stopPropagation();
+        if (this.promoteMeasurementGestureToPinch(event)) return;
+        handle.classList.add("is-active");
+        handle.querySelector(".measurement-handle-dot")?.setAttribute("r", 7);
         event.currentTarget.setPointerCapture?.(event.pointerId);
-        this.draggingMeasurement = { key, pointerId: event.pointerId };
+        this.draggingMeasurement = {
+          key,
+          pointerId: event.pointerId,
+          clientX: event.clientX,
+          clientY: event.clientY,
+          lastClientX: event.clientX,
+          lastClientY: event.clientY,
+          measurementBefore: structuredClone(this.measurement),
+        };
       });
       return handle;
     };
@@ -481,15 +500,44 @@ export class PlanRenderer {
     return snapMeasurementPoint(point, this.document, thresholdCm);
   }
 
+  promoteMeasurementGestureToPinch(event) {
+    const active = this.measurementPointer ?? this.draggingMeasurement;
+    if (!active || active.pointerId === event.pointerId) return false;
+    event.preventDefault();
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    this.measurement = structuredClone(active.measurementBefore ?? this.measurement);
+    this.pointers.clear();
+    this.pointers.set(active.pointerId, {
+      x: active.lastClientX ?? active.clientX,
+      y: active.lastClientY ?? active.clientY,
+    });
+    this.pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    this.measurementPointer = null;
+    this.draggingMeasurement = null;
+    this.updateMeasurementOverlay();
+    return true;
+  }
+
   bindGestures() {
     this.svg.addEventListener("pointerdown", (event) => {
       if (this.measurementMode) {
         event.preventDefault();
+        if (this.promoteMeasurementGestureToPinch(event)) return;
         event.target.setPointerCapture?.(event.pointerId);
+        const measurementBefore = structuredClone(this.measurement);
         const point = this.measurementPointFromEvent(event);
         const startsNew = !this.measurement.from || this.measurement.to;
         if (startsNew) this.measurement = { from: point, to: null };
-        this.measurementPointer = { pointerId: event.pointerId, clientX: event.clientX, clientY: event.clientY, action: startsNew ? "from" : "to", moved: false };
+        this.measurementPointer = {
+          pointerId: event.pointerId,
+          clientX: event.clientX,
+          clientY: event.clientY,
+          lastClientX: event.clientX,
+          lastClientY: event.clientY,
+          action: startsNew ? "from" : "to",
+          moved: false,
+          measurementBefore,
+        };
         this.updateMeasurementOverlay();
         return;
       }
@@ -499,6 +547,8 @@ export class PlanRenderer {
     this.svg.addEventListener("pointermove", (event) => {
       if (this.draggingMeasurement?.pointerId === event.pointerId) {
         event.preventDefault();
+        this.draggingMeasurement.lastClientX = event.clientX;
+        this.draggingMeasurement.lastClientY = event.clientY;
         this.measurement[this.draggingMeasurement.key] = this.measurementPointFromEvent(event);
         this.updateMeasurementOverlay();
         return;
@@ -506,6 +556,8 @@ export class PlanRenderer {
       if (this.measurementPointer?.pointerId === event.pointerId) {
         event.preventDefault();
         const pointer = this.measurementPointer;
+        pointer.lastClientX = event.clientX;
+        pointer.lastClientY = event.clientY;
         if (!pointer.moved && Math.hypot(event.clientX - pointer.clientX, event.clientY - pointer.clientY) >= 4) pointer.moved = true;
         if (pointer.moved) {
           this.measurement.to = this.measurementPointFromEvent(event);

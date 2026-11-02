@@ -324,7 +324,10 @@ dialog::backdrop { background: rgba(32,36,31,.42); backdrop-filter: blur(2px); }
 .measurement-line { stroke: #276b9d; stroke-width: 3; vector-effect: non-scaling-stroke; pointer-events: none; }
 .measurement-handle { cursor: move; }
 .measurement-handle-hit { fill: transparent; }
-.measurement-handle-dot { fill: #fff; stroke: #276b9d; stroke-width: 4; vector-effect: non-scaling-stroke; }
+.measurement-handle-dot { fill: #fff; stroke: #276b9d; stroke-width: 3; vector-effect: non-scaling-stroke; transition: r .18s ease; }
+.measurement-handle-to .measurement-handle-dot { fill: #276b9d; stroke: #fff; }
+.measurement-handle-label { fill: #235b84; font-size: 10px; font-weight: 900; paint-order: stroke; stroke: #f8fcff; stroke-width: 4px; stroke-linejoin: round; pointer-events: none; }
+.measurement-handle.is-active .measurement-handle-label { font-size: 11px; }
 .measurement-distance, .measurement-breakdown { fill: #235b84; font-weight: 850; text-anchor: middle; paint-order: stroke; stroke: #f8fcff; stroke-width: 6px; stroke-linejoin: round; pointer-events: none; }
 .measurement-distance { font-size: 15px; }
 .measurement-breakdown { font-size: 11px; }
