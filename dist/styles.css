@@ -217,6 +217,8 @@ button { color: inherit; touch-action: manipulation; }
 .three-intro { margin: 0 4px 11px; color: var(--muted); font-size: .73rem; line-height: 1.65; }
 .three-toolbar { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; margin-bottom: 8px; }
 .three-toolbar button { min-height: 38px; border: 1px solid var(--line); border-radius: 11px; background: var(--surface); color: var(--accent); font-size: .7rem; font-weight: 800; }
+.three-room-filter { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 10px; margin: 0 3px 9px; color: var(--muted); font-size: .68rem; font-weight: 800; }
+.three-room-filter select { min-width: 0; min-height: 38px; padding: 0 34px 0 11px; border: 1px solid var(--line); border-radius: 11px; background: var(--surface); color: var(--ink); font: inherit; font-size: 16px; }
 .three-options { display: flex; flex-wrap: wrap; gap: 7px 14px; margin: 0 3px 9px; color: var(--muted); font-size: .68rem; font-weight: 700; }
 .three-options label { display: inline-flex; align-items: center; gap: 6px; }
 .three-options input { accent-color: var(--accent); }

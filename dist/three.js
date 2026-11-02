@@ -1,4 +1,4 @@
-import { featureSupportRange, resolveFurnitureVerticalRange } from "./model.js?v=51";
+import { featureSupportRange, pointInPolygon, resolveFurnitureVerticalRange } from "./model.js?v=52";
 
 const NS = "http://www.w3.org/2000/svg";
 
@@ -21,6 +21,29 @@ export function projectThreePoint(point, bounds, quarterTurn = 0, z = 0) {
 function pointsValue(points) { return points.map((point) => `${point.x},${point.y}`).join(" "); }
 
 export function threeLayerEnabled(layer, options = {}) { return options[layer] !== false; }
+
+export function threeItemBelongsToRoom(item, roomId) {
+  if (!roomId) return true;
+  return item?.roomId === roomId || item?.roomIds?.includes(roomId) === true;
+}
+
+export function threeRoomBounds(rooms, fallback = { x: 0, y: 0, width: 1, height: 1 }) {
+  const points = rooms.flatMap((room) => room.points ?? []).filter((point) => Number.isFinite(point.x) && Number.isFinite(point.y));
+  if (!points.length) return fallback;
+  const minX = Math.min(...points.map((point) => point.x));
+  const maxX = Math.max(...points.map((point) => point.x));
+  const minY = Math.min(...points.map((point) => point.y));
+  const maxY = Math.max(...points.map((point) => point.y));
+  return { x: minX, y: minY, width: Math.max(1, maxX - minX), height: Math.max(1, maxY - minY) };
+}
+
+export function threeWallBelongsToRoom(wall, room) {
+  if (!room) return true;
+  if (wall?.roomId || wall?.roomIds) return threeItemBelongsToRoom(wall, room.id);
+  if (!wall?.from || !wall?.to) return false;
+  const midpoint = { x: (wall.from.x + wall.to.x) / 2, y: (wall.from.y + wall.to.y) / 2 };
+  return [wall.from, midpoint, wall.to].some((point) => pointInPolygon(point, room.points));
+}
 
 export function visibleBoxSideIndexes(projectedBase) {
   return projectedBase
@@ -135,9 +158,18 @@ export function renderThreeView(canvas, documentData, options = {}, onOpeningSel
   const showFeatures = threeLayerEnabled("features", options);
   const showFurniture = threeLayerEnabled("furniture", options);
   const { plan } = documentData;
-  const bounds = plan.bounds;
-  const drawableOpenings = (plan.openings ?? []).map((opening) => ({ opening, range: openingVerticalRange(opening) })).filter((item) => item.range);
-  const featureItems = (plan.features ?? []).filter((item) => item.kind !== "column").map((item) => ({ ...item, depth: item.height, vertical: featureVerticalRange(item), type: "feature" }));
+  const selectedRoom = options.roomId ? (plan.rooms ?? []).find((room) => room.id === options.roomId) : null;
+  const displayRooms = selectedRoom ? [selectedRoom] : (plan.rooms ?? []);
+  const bounds = selectedRoom ? threeRoomBounds(displayRooms, plan.bounds) : plan.bounds;
+  const drawableOpenings = (plan.openings ?? [])
+    .filter((opening) => threeItemBelongsToRoom(opening, selectedRoom?.id))
+    .map((opening) => ({ opening, range: openingVerticalRange(opening) }))
+    .filter((item) => item.range);
+  const featureItems = (plan.features ?? [])
+    .filter((item) => item.kind !== "column" && threeItemBelongsToRoom(item, selectedRoom?.id))
+    .map((item) => ({ ...item, depth: item.height, vertical: featureVerticalRange(item), type: "feature" }));
+  const furnitureItems = (plan.furniture ?? []).filter((item) => threeItemBelongsToRoom(item, selectedRoom?.id));
+  const partitionWalls = (plan.walls ?? []).filter((wall) => wall.from && wall.to && threeWallBelongsToRoom(wall, selectedRoom));
   const wallDisplayHeight = Math.max(220, ...drawableOpenings.map((item) => item.range.topCm + 20), ...featureItems.map((item) => item.vertical.topCm + 10));
   const projectedBounds = [
     { x: bounds.x, y: bounds.y }, { x: bounds.x + bounds.width, y: bounds.y },
@@ -156,7 +188,7 @@ export function renderThreeView(canvas, documentData, options = {}, onOpeningSel
   const surfaces = [];
   let hiddenWallCount = 0;
   const cutOpeningIds = new Set();
-  for (const room of plan.rooms ?? []) {
+  for (const room of displayRooms) {
     floorLayer.append(svg("polygon", { class: "three-floor", points: pointsValue(room.points.map((point) => project(point))), fill: room.color ?? "#e9e4d8" }));
     const labelPoint = project(room.label ?? room.points[0]);
     labelLayer.append(svg("text", { class: "three-room-label", x: labelPoint.x, y: labelPoint.y }, room.name));
@@ -179,7 +211,7 @@ export function renderThreeView(canvas, documentData, options = {}, onOpeningSel
       }
     });
   }
-  for (const wall of plan.walls ?? []) {
+  for (const wall of partitionWalls) {
     if (!showWalls) break;
     if (!wall.from || !wall.to) continue;
     const bottomA = project(wall.from); const bottomB = project(wall.to);
@@ -196,7 +228,7 @@ export function renderThreeView(canvas, documentData, options = {}, onOpeningSel
   }
   for (const { opening, range } of drawableOpenings) {
     if (!showOpenings) break;
-    if (showWalls && cutaway && openingIsOnCutawayEdge(opening, plan.rooms ?? [], quarterTurn)) continue;
+    if (showWalls && cutaway && openingIsOnCutawayEdge(opening, displayRooms, quarterTurn)) continue;
     const bottomFrom = project(opening.from, range.bottomCm);
     const bottomTo = project(opening.to, range.bottomCm);
     const panel = svg("polygon", {
@@ -216,7 +248,7 @@ export function renderThreeView(canvas, documentData, options = {}, onOpeningSel
   }
   const boxes = [
     ...(showFeatures ? featureItems : []),
-    ...(showFurniture ? (plan.furniture ?? []).map((item) => ({ ...item, width: item.widthCm, depth: item.depthCm, vertical: resolveFurnitureVerticalRange(plan, item), type: "furniture" })) : []),
+    ...(showFurniture ? furnitureItems.map((item) => ({ ...item, width: item.widthCm, depth: item.depthCm, vertical: resolveFurnitureVerticalRange(plan, item), type: "furniture" })) : []),
   ].filter((item) => [item.x, item.y, item.width, item.depth].every(Number.isFinite));
   boxes.sort((a, b) => (a.x + a.y) - (b.x + b.y));
   for (const item of boxes) {
@@ -249,7 +281,8 @@ export function renderThreeView(canvas, documentData, options = {}, onOpeningSel
     cutOpeningCount: cutOpeningIds.size,
     wallDisplayHeight,
     hiddenWallCount,
-    partitionWallCount: (plan.walls ?? []).filter((wall) => wall.from && wall.to).length,
-    furnitureWithoutHeight: (plan.furniture ?? []).filter((item) => !Number.isFinite(item.heightCm)).length,
+    partitionWallCount: partitionWalls.length,
+    furnitureWithoutHeight: furnitureItems.filter((item) => !Number.isFinite(item.heightCm)).length,
+    selectedRoomName: selectedRoom?.name ?? null,
   };
 }

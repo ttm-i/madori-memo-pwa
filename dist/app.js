@@ -1,7 +1,7 @@
-import { deleteActivePlan, loadActivePlan, saveActivePlan } from "./db.js?v=51";
-import { alignFurnitureToSupport, alignSupportedFurniture, analyzeDeliveryRoute, analyzeFurnitureConflicts, analyzeFurniturePlacement, buildElevationItems, buildRoomWalls, buildWallDiagram, countQualities, createSamplePlan, DIMENSION_GROUP_LABELS, duplicateFurniture, findSupportItem, getDimensionGroup, getElectricalPlanPosition, resolveFurnitureVerticalRange, rotateFurniture, updateFurniture, validatePlan, wallDisplayWidth } from "./model.js?v=51";
-import { detailMarkup, measurementMetrics, PlanRenderer } from "./renderer.js?v=51";
-import { renderThreeView } from "./three.js?v=51";
+import { deleteActivePlan, loadActivePlan, saveActivePlan } from "./db.js?v=52";
+import { alignFurnitureToSupport, alignSupportedFurniture, analyzeDeliveryRoute, analyzeFurnitureConflicts, analyzeFurniturePlacement, buildElevationItems, buildRoomWalls, buildWallDiagram, countQualities, createSamplePlan, DIMENSION_GROUP_LABELS, duplicateFurniture, findSupportItem, getDimensionGroup, getElectricalPlanPosition, resolveFurnitureVerticalRange, rotateFurniture, updateFurniture, validatePlan, wallDisplayWidth } from "./model.js?v=52";
+import { detailMarkup, measurementMetrics, PlanRenderer } from "./renderer.js?v=52";
+import { renderThreeView } from "./three.js?v=52";
 
 const elements = Object.fromEntries([
   "menuButton", "dataMenu", "detailDialog", "detailType", "detailTitle", "detailBody", "fileInput",
@@ -27,7 +27,7 @@ const elements = Object.fromEntries([
   "deliveryDialog", "deliveryForm", "deliveryDialogTitle", "cancelDeliveryButton", "deliveryBasis",
   "deliverySideA", "deliverySideB", "deliverySideC",
   "threeCanvas", "threeEmpty", "threeRotateLeft", "threeRotateRight", "threeReset", "threeHeightNote", "threeCutawayToggle", "threeLabelsToggle",
-  "threeWallsToggle", "threeOpeningsToggle", "threeFeaturesToggle", "threeFurnitureToggle",
+  "threeRoomFilter", "threeWallsToggle", "threeOpeningsToggle", "threeFeaturesToggle", "threeFurnitureToggle",
 ].map((id) => [id, document.getElementById(id)]));
 
 let activePlan = null;
@@ -45,6 +45,7 @@ let deliveryFurnitureId = null;
 let threeQuarterTurn = 0;
 let threeCutaway = true;
 let threeShowLabels = false;
+let threeRoomId = "";
 const threeLayers = { walls: true, openings: true, features: true, furniture: true };
 const selectableByMode = {
   view: new Set(["room", "dimension", "equipment", "electrical", "furniture"]),
@@ -64,13 +65,23 @@ function updateThreeView() {
     quarterTurn: threeQuarterTurn,
     cutaway: threeCutaway,
     showLabels: threeShowLabels,
+    roomId: threeRoomId || null,
     ...threeLayers,
   }, (opening) => showDetail("opening", opening));
-  const notes = [`ドア・窓 ${result.openingCount}点のうち ${result.cutOpeningCount}点を壁の開口として反映。間仕切り壁 ${result.partitionWallCount}点。壁上端は天井位置ではありません。`];
+  const scope = result.selectedRoomName ? `${result.selectedRoomName}を表示中。` : "全体を表示中。";
+  const notes = [`${scope} ドア・窓 ${result.openingCount}点のうち ${result.cutOpeningCount}点を壁の開口として反映。間仕切り壁 ${result.partitionWallCount}点。壁上端は天井位置ではありません。`];
   notes.push(result.furnitureWithoutHeight
     ? `高さ未登録の家具 ${result.furnitureWithoutHeight}点は、位置確認用の低い箱として表示しています。`
     : "家具の高さデータを反映しています。");
   elements.threeHeightNote.textContent = notes.join(" ");
+}
+
+function updateThreeRoomFilter() {
+  const rooms = activePlan?.plan?.rooms ?? [];
+  if (threeRoomId && !rooms.some((room) => room.id === threeRoomId)) threeRoomId = "";
+  const options = [new Option("全体", ""), ...rooms.map((room) => new Option(room.name, room.id))];
+  elements.threeRoomFilter.replaceChildren(...options);
+  elements.threeRoomFilter.value = threeRoomId;
 }
 
 function updateUndoButton() {
@@ -623,6 +634,7 @@ async function setActivePlan(plan, { persist = true } = {}) {
   updateWallView();
   renderDeliveryView();
   updateDimensionFilters();
+  updateThreeRoomFilter();
   requestAnimationFrame(() => renderer.fit());
   if (persist) {
     await persistActivePlan();
@@ -818,6 +830,7 @@ elements.threeRotateRight.addEventListener("click", () => { threeQuarterTurn = (
 elements.threeReset.addEventListener("click", () => { threeQuarterTurn = 0; updateThreeView(); });
 elements.threeCutawayToggle.addEventListener("change", () => { threeCutaway = elements.threeCutawayToggle.checked; updateThreeView(); });
 elements.threeLabelsToggle.addEventListener("change", () => { threeShowLabels = elements.threeLabelsToggle.checked; updateThreeView(); });
+elements.threeRoomFilter.addEventListener("change", () => { threeRoomId = elements.threeRoomFilter.value; updateThreeView(); });
 for (const [toggle, layer] of [
   [elements.threeWallsToggle, "walls"],
   [elements.threeOpeningsToggle, "openings"],

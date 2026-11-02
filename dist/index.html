@@ -10,7 +10,7 @@
     <meta name="description" content="間取りと家具寸法を端末内だけで確認するオフラインPWA" />
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" href="./icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="./styles.css?v=51" />
+    <link rel="stylesheet" href="./styles.css?v=52" />
     <title>間取りメモ</title>
   </head>
   <body>
@@ -218,6 +218,10 @@
             <button id="threeReset" type="button">初期方向</button>
             <button id="threeRotateRight" type="button" aria-label="右へ90度回転">右へ ↷</button>
           </div>
+          <label class="three-room-filter" for="threeRoomFilter">
+            <span>表示範囲</span>
+            <select id="threeRoomFilter" aria-label="3Dで表示する部屋"><option value="">全体</option></select>
+          </label>
           <div class="three-options" aria-label="3Dの表示設定">
             <label><input id="threeCutawayToggle" type="checkbox" checked /> 手前の壁を外す</label>
             <label><input id="threeLabelsToggle" type="checkbox" /> 家具・設備名を表示</label>
@@ -341,7 +345,7 @@
       <input id="fileInput" type="file" accept="application/json,.json" hidden />
       <div id="toast" class="toast" role="status" aria-live="polite"></div>
     </div>
-    <script type="module" src="./app.js?v=51"></script>
+    <script type="module" src="./app.js?v=52"></script>
   </body>
 </html>
 

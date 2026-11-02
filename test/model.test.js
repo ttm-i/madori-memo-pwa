@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { alignFurnitureToSupport, analyzeDeliveryRoute, analyzeFurnitureConflicts, analyzeFurniturePlacement, buildElevationItems, buildRoomWalls, buildWallDiagram, countQualities, createSamplePlan, duplicateFurniture, findDeliveryDoorPath, fitsRectangle, FORMAT, getDimensionGroup, getElectricalPlanPosition, moveDimensionGuide, pointInPolygon, rectanglesOverlap, resolveFurnitureElevationPlacement, resolveFurnitureVerticalRange, rotateFurniture, snapToGrid, updateFurniture, validatePlan, wallDisplayWidth } from "../dist/model.js";
 import { buildKitchenComponentRects, detailMarkup, gestureExceedsTapThreshold, measurementMetrics, PlanRenderer, snapMeasurementPoint, zoomTransformAround } from "../dist/renderer.js";
-import { featureVerticalRange, isCutawayEdge, openingVerticalRange, projectThreePoint, splitWallFace, threeLayerEnabled, visibleBoxSideIndexes } from "../dist/three.js";
+import { featureVerticalRange, isCutawayEdge, openingVerticalRange, projectThreePoint, splitWallFace, threeItemBelongsToRoom, threeLayerEnabled, threeRoomBounds, threeWallBelongsToRoom, visibleBoxSideIndexes } from "../dist/three.js";
 
 test("sample plan conforms to the public schema", () => {
   const sample = createSamplePlan();
@@ -350,6 +350,19 @@ test("3D layers default to visible and can be independently hidden", () => {
   assert.equal(threeLayerEnabled("walls", {}), true);
   assert.equal(threeLayerEnabled("walls", { walls: false, furniture: true }), false);
   assert.equal(threeLayerEnabled("furniture", { walls: false, furniture: true }), true);
+});
+
+test("3D room focus filters room-owned items and recalculates its bounds", () => {
+  assert.equal(threeItemBelongsToRoom({ roomId: "ldk" }, "ldk"), true);
+  assert.equal(threeItemBelongsToRoom({ roomIds: ["ldk", "hall"] }, "hall"), true);
+  assert.equal(threeItemBelongsToRoom({ roomId: "bedroom" }, "ldk"), false);
+  assert.deepEqual(threeRoomBounds([{ points: [{ x: 20, y: 30 }, { x: 220, y: 180 }] }]), { x: 20, y: 30, width: 200, height: 150 });
+});
+
+test("3D room focus retains unassigned partition walls inside the room", () => {
+  const room = { id: "ldk", points: [{ x: 0, y: 0 }, { x: 200, y: 0 }, { x: 200, y: 200 }, { x: 0, y: 200 }] };
+  assert.equal(threeWallBelongsToRoom({ from: { x: 50, y: 50 }, to: { x: 150, y: 50 } }, room), true);
+  assert.equal(threeWallBelongsToRoom({ from: { x: 250, y: 50 }, to: { x: 300, y: 50 } }, room), false);
 });
 
 test("3D boxes choose the two front faces after every rotation", () => {
