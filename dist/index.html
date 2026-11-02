@@ -10,7 +10,7 @@
     <meta name="description" content="間取りと家具寸法を端末内だけで確認するオフラインPWA" />
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" href="./icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="./styles.css?v=50" />
+    <link rel="stylesheet" href="./styles.css?v=51" />
     <title>間取りメモ</title>
   </head>
   <body>
@@ -209,7 +209,7 @@
 
         <section id="threeView" class="view three-view" aria-label="概略3D表示">
           <div class="three-heading">
-            <div><p class="eyebrow">3D OVERVIEW · PHASE 1</p><h2>概略3D</h2></div>
+            <div><p class="eyebrow">3D OVERVIEW · PHASE 2</p><h2>概略3D</h2></div>
             <span class="unmeasured-badge">天井高 未測定</span>
           </div>
           <p class="three-intro">床形状と家具・設備の位置関係を確認するための軽量表示です。壁の高さと、高さ未登録の家具は模式表示であり、実測値ではありません。</p>
@@ -221,6 +221,10 @@
           <div class="three-options" aria-label="3Dの表示設定">
             <label><input id="threeCutawayToggle" type="checkbox" checked /> 手前の壁を外す</label>
             <label><input id="threeLabelsToggle" type="checkbox" /> 家具・設備名を表示</label>
+            <label><input id="threeWallsToggle" type="checkbox" checked /> 壁</label>
+            <label><input id="threeOpeningsToggle" type="checkbox" checked /> ドア・窓</label>
+            <label><input id="threeFeaturesToggle" type="checkbox" checked /> 設備</label>
+            <label><input id="threeFurnitureToggle" type="checkbox" checked /> 家具</label>
           </div>
           <div class="three-canvas-frame">
             <svg id="threeCanvas" viewBox="0 0 900 620" role="img" aria-label="間取りの概略3D"></svg>
@@ -337,7 +341,7 @@
       <input id="fileInput" type="file" accept="application/json,.json" hidden />
       <div id="toast" class="toast" role="status" aria-live="polite"></div>
     </div>
-    <script type="module" src="./app.js?v=50"></script>
+    <script type="module" src="./app.js?v=51"></script>
   </body>
 </html>
 

@@ -1,4 +1,4 @@
-import { featureSupportRange, resolveFurnitureVerticalRange } from "./model.js?v=50";
+import { featureSupportRange, resolveFurnitureVerticalRange } from "./model.js?v=51";
 
 const NS = "http://www.w3.org/2000/svg";
 
@@ -19,6 +19,8 @@ export function projectThreePoint(point, bounds, quarterTurn = 0, z = 0) {
 }
 
 function pointsValue(points) { return points.map((point) => `${point.x},${point.y}`).join(" "); }
+
+export function threeLayerEnabled(layer, options = {}) { return options[layer] !== false; }
 
 export function visibleBoxSideIndexes(projectedBase) {
   return projectedBase
@@ -128,6 +130,10 @@ export function renderThreeView(canvas, documentData, options = {}, onOpeningSel
   const quarterTurn = options.quarterTurn ?? 0;
   const cutaway = options.cutaway !== false;
   const showLabels = options.showLabels === true;
+  const showWalls = threeLayerEnabled("walls", options);
+  const showOpenings = threeLayerEnabled("openings", options);
+  const showFeatures = threeLayerEnabled("features", options);
+  const showFurniture = threeLayerEnabled("furniture", options);
   const { plan } = documentData;
   const bounds = plan.bounds;
   const drawableOpenings = (plan.openings ?? []).map((opening) => ({ opening, range: openingVerticalRange(opening) })).filter((item) => item.range);
@@ -169,11 +175,12 @@ export function renderThreeView(canvas, documentData, options = {}, onOpeningSel
         const topB = project(pointAt(rectangle.u2), rectangle.z2);
         const topA = project(pointAt(rectangle.u1), rectangle.z2);
         const depthA = project(pointAt(rectangle.u1)).y; const depthB = project(pointAt(rectangle.u2)).y;
-        surfaces.push({ depth: (depthA + depthB) / 2, order: 0, element: svg("polygon", { class: "three-wall", points: pointsValue([bottomA, bottomB, topB, topA]) }) });
+        if (showWalls) surfaces.push({ depth: (depthA + depthB) / 2, order: 0, element: svg("polygon", { class: "three-wall", points: pointsValue([bottomA, bottomB, topB, topA]) }) });
       }
     });
   }
   for (const wall of plan.walls ?? []) {
+    if (!showWalls) break;
     if (!wall.from || !wall.to) continue;
     const bottomA = project(wall.from); const bottomB = project(wall.to);
     const topA = project(wall.from, wallDisplayHeight); const topB = project(wall.to, wallDisplayHeight);
@@ -188,7 +195,8 @@ export function renderThreeView(canvas, documentData, options = {}, onOpeningSel
     });
   }
   for (const { opening, range } of drawableOpenings) {
-    if (cutaway && openingIsOnCutawayEdge(opening, plan.rooms ?? [], quarterTurn)) continue;
+    if (!showOpenings) break;
+    if (showWalls && cutaway && openingIsOnCutawayEdge(opening, plan.rooms ?? [], quarterTurn)) continue;
     const bottomFrom = project(opening.from, range.bottomCm);
     const bottomTo = project(opening.to, range.bottomCm);
     const panel = svg("polygon", {
@@ -207,8 +215,8 @@ export function renderThreeView(canvas, documentData, options = {}, onOpeningSel
     surfaces.push({ depth: (bottomFrom.y + bottomTo.y) / 2, order: 1, element: panel });
   }
   const boxes = [
-    ...featureItems,
-    ...(plan.furniture ?? []).map((item) => ({ ...item, width: item.widthCm, depth: item.depthCm, vertical: resolveFurnitureVerticalRange(plan, item), type: "furniture" })),
+    ...(showFeatures ? featureItems : []),
+    ...(showFurniture ? (plan.furniture ?? []).map((item) => ({ ...item, width: item.widthCm, depth: item.depthCm, vertical: resolveFurnitureVerticalRange(plan, item), type: "furniture" })) : []),
   ].filter((item) => [item.x, item.y, item.width, item.depth].every(Number.isFinite));
   boxes.sort((a, b) => (a.x + a.y) - (b.x + b.y));
   for (const item of boxes) {

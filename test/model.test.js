@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { alignFurnitureToSupport, analyzeDeliveryRoute, analyzeFurnitureConflicts, analyzeFurniturePlacement, buildElevationItems, buildRoomWalls, buildWallDiagram, countQualities, createSamplePlan, duplicateFurniture, findDeliveryDoorPath, fitsRectangle, FORMAT, getDimensionGroup, getElectricalPlanPosition, moveDimensionGuide, pointInPolygon, rectanglesOverlap, resolveFurnitureElevationPlacement, resolveFurnitureVerticalRange, rotateFurniture, snapToGrid, updateFurniture, validatePlan, wallDisplayWidth } from "../dist/model.js";
 import { buildKitchenComponentRects, detailMarkup, gestureExceedsTapThreshold, measurementMetrics, PlanRenderer, snapMeasurementPoint, zoomTransformAround } from "../dist/renderer.js";
-import { featureVerticalRange, isCutawayEdge, openingVerticalRange, projectThreePoint, splitWallFace, visibleBoxSideIndexes } from "../dist/three.js";
+import { featureVerticalRange, isCutawayEdge, openingVerticalRange, projectThreePoint, splitWallFace, threeLayerEnabled, visibleBoxSideIndexes } from "../dist/three.js";
 
 test("sample plan conforms to the public schema", () => {
   const sample = createSamplePlan();
@@ -344,6 +344,12 @@ test("3D overview projection rotates the plan without changing its scale", () =>
   assert.deepEqual(original, { x: 72, y: 36 });
   assert.deepEqual(rotated, { x: -72, y: 36 });
   assert.equal(projectThreePoint({ x: 300, y: 150 }, bounds, 0, 100).y, -26);
+});
+
+test("3D layers default to visible and can be independently hidden", () => {
+  assert.equal(threeLayerEnabled("walls", {}), true);
+  assert.equal(threeLayerEnabled("walls", { walls: false, furniture: true }), false);
+  assert.equal(threeLayerEnabled("furniture", { walls: false, furniture: true }), true);
 });
 
 test("3D boxes choose the two front faces after every rotation", () => {
