@@ -10,7 +10,7 @@
     <meta name="description" content="間取りと家具寸法を端末内だけで確認するオフラインPWA" />
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" href="./icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="./styles.css?v=47" />
+    <link rel="stylesheet" href="./styles.css?v=48" />
     <title>間取りメモ</title>
   </head>
   <body>
@@ -302,7 +302,7 @@
           <label class="field-label">設置面
             <select id="furnitureSupport" name="support"><option value="">床に置く</option></select>
           </label>
-          <p id="furnitureSupportHelp" class="form-help">設備や家具の上に置く場合、平面上の位置と3Dの高さを連動します。</p>
+          <p id="furnitureSupportHelp" class="form-help">設備や家具の上に置く場合、支持面内の位置と3Dの高さを連動します。</p>
           <p class="form-help">選んだ部屋を基準に、部屋外判定と壁までの距離を計算します。床置きの家具は「🔓 編集」で移動できます。</p>
           <button id="furnitureSubmitButton" class="primary-button full-width" type="submit">追加する</button>
         </form>
@@ -334,7 +334,7 @@
       <input id="fileInput" type="file" accept="application/json,.json" hidden />
       <div id="toast" class="toast" role="status" aria-live="polite"></div>
     </div>
-    <script type="module" src="./app.js?v=47"></script>
+    <script type="module" src="./app.js?v=48"></script>
   </body>
 </html>
 

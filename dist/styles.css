@@ -343,6 +343,8 @@ dialog::backdrop { background: rgba(32,36,31,.42); backdrop-filter: blur(2px); }
 .furniture-size-label { fill: #5f4631; font-size: 10px; font-weight: 650; text-anchor: middle; dominant-baseline: middle; pointer-events: none; }
 .furniture-support-label { fill: #356859; font-size: 8px; font-weight: 850; text-anchor: middle; pointer-events: none; paint-order: stroke; stroke: #fff8ed; stroke-width: 3px; }
 .furniture-group.is-supported .furniture-shape { stroke-dasharray: 4 2; }
+.editing .furniture-group.is-supported { cursor: move; }
+.editing .furniture-group.is-supported-fixed { cursor: not-allowed; }
 .furniture-group.selected .furniture-shape { stroke: var(--accent); stroke-width: 4; }
 .furniture-group.out-of-room .furniture-shape { fill: #efd0cc; stroke: var(--danger); stroke-width: 4; stroke-dasharray: 7 4; }
 .furniture-group.has-conflict:not(.out-of-room) .furniture-shape { fill: #f2dfbd; stroke: var(--warning); stroke-width: 4; stroke-dasharray: 7 4; }
@@ -382,7 +384,7 @@ dialog::backdrop { background: rgba(32,36,31,.42); backdrop-filter: blur(2px); }
 .not-selectable { pointer-events: none; }
 .form-dialog form { padding: 18px; }
 .field-label { display: grid; gap: 7px; margin: 14px 0; color: var(--muted); font-size: .76rem; font-weight: 700; }
-.field-label input, .field-label select { width: 100%; min-height: 46px; padding: 0 12px; border: 1px solid var(--line); border-radius: 11px; background: white; color: var(--ink); }
+.field-label input, .field-label select { width: 100%; min-height: 46px; padding: 0 12px; border: 1px solid var(--line); border-radius: 11px; background: white; color: var(--ink); font-size: 16px; }
 .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .form-help { color: var(--muted); font-size: .73rem; line-height: 1.6; }
 .full-width { width: 100%; }

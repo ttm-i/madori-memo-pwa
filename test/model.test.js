@@ -18,6 +18,13 @@ test("invalid coordinates are rejected", () => {
   assert.throws(() => validatePlan(sample), /座標が不正/);
 });
 
+test("structural columns represented by the room outline are removed from equipment", () => {
+  const sample = createSamplePlan();
+  sample.plan.features.push({ id: "structural-column", name: "柱型", kind: "column", roomId: "sample-room", x: 0, y: 0, width: 20, height: 20 });
+  const validated = validatePlan(sample);
+  assert.equal(validated.plan.features.some((feature) => feature.kind === "column"), false);
+});
+
 test("quality counts include uncertain room geometry", () => {
   const sample = createSamplePlan();
   sample.plan.rooms[0].uncertain = true;
@@ -134,6 +141,7 @@ test("plan styles can independently hide each display layer", () => {
   assert.match(css, /features-hidden/);
   assert.match(css, /furniture-hidden/);
   assert.match(css, /electrical-hidden/);
+  assert.match(css, /\.field-label input, \.field-label select[^}]*font-size:\s*16px/);
 });
 
 test("custom elevations can replace a room edge and omit a non-wall opening", () => {
@@ -289,6 +297,11 @@ test("supported furniture aligns to its base and stacks measured heights", () =>
   alignFurnitureToSupport(plan, plan.furniture[0]);
   alignFurnitureToSupport(plan, plan.furniture[1]);
   assert.deepEqual({ x: plan.furniture[0].x, y: plan.furniture[0].y }, { x: 12, y: 22 });
+  assert.deepEqual({ x: plan.furniture[0].supportOffsetX, y: plan.furniture[0].supportOffsetY }, { x: 2, y: 2 });
+  plan.furniture[0].supportOffsetX = 99;
+  plan.furniture[0].supportOffsetY = -10;
+  alignFurnitureToSupport(plan, plan.furniture[0]);
+  assert.deepEqual({ x: plan.furniture[0].x, y: plan.furniture[0].y }, { x: 14, y: 20 });
   assert.deepEqual(resolveFurnitureVerticalRange(plan, plan.furniture[0]), { bottomCm: 4, topCm: 109, schematic: true, support: plan.features[0] });
   assert.equal(resolveFurnitureVerticalRange(plan, plan.furniture[1]).bottomCm, 109);
   assert.deepEqual(analyzeFurnitureConflicts(plan.furniture[0], plan), []);

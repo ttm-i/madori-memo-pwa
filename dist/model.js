@@ -36,6 +36,7 @@ export function validatePlan(input) {
   input.plan.walls ??= [];
   input.plan.openings ??= [];
   input.plan.features ??= [];
+  input.plan.features = input.plan.features.filter((feature) => feature.kind !== "column");
   input.plan.furniture ??= [];
   for (const room of input.plan.rooms) {
     if (!room.id || !room.name || !Array.isArray(room.points) || room.points.length < 3) {
@@ -50,7 +51,7 @@ export function validatePlan(input) {
 
 export function findSupportItem(plan, supportId) {
   if (!supportId) return null;
-  return (plan?.features ?? []).find((item) => item.id === supportId)
+  return (plan?.features ?? []).find((item) => item.kind !== "column" && item.id === supportId)
     ?? (plan?.furniture ?? []).find((item) => item.id === supportId)
     ?? null;
 }
@@ -94,8 +95,20 @@ export function alignFurnitureToSupport(plan, furniture) {
   const width = support.widthCm ?? support.width;
   const depth = support.depthCm ?? support.height;
   if (![support.x, support.y, width, depth].every(Number.isFinite)) return furniture;
-  furniture.x = support.x + (width - furniture.widthCm) / 2;
-  furniture.y = support.y + (depth - furniture.depthCm) / 2;
+  const availableX = width - furniture.widthCm;
+  const availableY = depth - furniture.depthCm;
+  const defaultX = availableX / 2;
+  const defaultY = availableY / 2;
+  const offsetX = availableX >= 0
+    ? Math.max(0, Math.min(availableX, Number.isFinite(furniture.supportOffsetX) ? furniture.supportOffsetX : defaultX))
+    : defaultX;
+  const offsetY = availableY >= 0
+    ? Math.max(0, Math.min(availableY, Number.isFinite(furniture.supportOffsetY) ? furniture.supportOffsetY : defaultY))
+    : defaultY;
+  furniture.supportOffsetX = offsetX;
+  furniture.supportOffsetY = offsetY;
+  furniture.x = support.x + offsetX;
+  furniture.y = support.y + offsetY;
   if (support.roomId) furniture.roomId = support.roomId;
   return furniture;
 }
@@ -130,7 +143,7 @@ export function countQualities(plan) {
   const items = [
     ...(plan.plan.rooms ?? []),
     ...(plan.plan.dimensions ?? []),
-    ...(plan.plan.features ?? []),
+    ...(plan.plan.features ?? []).filter((item) => item.kind !== "column"),
     ...(plan.plan.openings ?? []),
     ...(plan.plan.walls ?? []),
     ...(plan.plan.electrical?.outlets ?? []),
@@ -167,6 +180,7 @@ export function buildElevationItems(documentData, roomId) {
   }
 
   for (const feature of documentData.plan.features ?? []) {
+    if (feature.kind === "column") continue;
     if (!belongsToRoom(feature, roomId)) continue;
     if (Number.isFinite(feature.bottomHeightCm) && Number.isFinite(feature.topHeightCm)) {
       addRange(feature.id, feature.name, "equipment", feature.bottomHeightCm, feature.topHeightCm);
@@ -385,8 +399,13 @@ export function updateFurniture(furniture, values) {
   furniture.depthCm = values.depthCm;
   if (Number.isFinite(values.heightCm)) furniture.heightCm = values.heightCm;
   else delete furniture.heightCm;
+  const supportChanged = furniture.supportId !== values.supportId;
   if (values.supportId) furniture.supportId = values.supportId;
   else delete furniture.supportId;
+  if (supportChanged || !values.supportId) {
+    delete furniture.supportOffsetX;
+    delete furniture.supportOffsetY;
+  }
   furniture.x = centerX - furniture.widthCm / 2;
   furniture.y = centerY - furniture.depthCm / 2;
   return furniture;
@@ -562,6 +581,7 @@ export function analyzeFurnitureConflicts(furniture, plan) {
     if (other.id !== furniture.id && overlapsVertically(resolveFurnitureVerticalRange(plan, other)) && rectanglesOverlap(furniture, other)) conflicts.push({ type: "furniture", id: other.id, name: other.name });
   }
   for (const feature of plan.features ?? []) {
+    if (feature.kind === "column") continue;
     if (overlapsVertically(featureSupportRange(feature)) && rectanglesOverlap(furniture, feature)) conflicts.push({ type: "feature", id: feature.id, name: feature.name });
   }
   for (const wall of plan.walls ?? []) {

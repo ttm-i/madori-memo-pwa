@@ -1,4 +1,4 @@
-import { featureSupportRange, resolveFurnitureVerticalRange } from "./model.js?v=47";
+import { featureSupportRange, resolveFurnitureVerticalRange } from "./model.js?v=48";
 
 const NS = "http://www.w3.org/2000/svg";
 
@@ -131,7 +131,7 @@ export function renderThreeView(canvas, documentData, options = {}, onOpeningSel
   const { plan } = documentData;
   const bounds = plan.bounds;
   const drawableOpenings = (plan.openings ?? []).map((opening) => ({ opening, range: openingVerticalRange(opening) })).filter((item) => item.range);
-  const featureItems = (plan.features ?? []).map((item) => ({ ...item, depth: item.height, vertical: featureVerticalRange(item), type: "feature" }));
+  const featureItems = (plan.features ?? []).filter((item) => item.kind !== "column").map((item) => ({ ...item, depth: item.height, vertical: featureVerticalRange(item), type: "feature" }));
   const wallDisplayHeight = Math.max(220, ...drawableOpenings.map((item) => item.range.topCm + 20), ...featureItems.map((item) => item.vertical.topCm + 10));
   const projectedBounds = [
     { x: bounds.x, y: bounds.y }, { x: bounds.x + bounds.width, y: bounds.y },

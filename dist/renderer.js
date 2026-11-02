@@ -1,4 +1,4 @@
-import { analyzeFurnitureConflicts, analyzeFurniturePlacement, getDimensionGroup, getElectricalPlanPosition, moveDimensionGuide, QUALITY_LABELS, snapToGrid } from "./model.js?v=47";
+import { analyzeFurnitureConflicts, analyzeFurniturePlacement, findSupportItem, getDimensionGroup, getElectricalPlanPosition, moveDimensionGuide, QUALITY_LABELS, snapToGrid } from "./model.js?v=48";
 
 const NS = "http://www.w3.org/2000/svg";
 
@@ -169,6 +169,7 @@ export class PlanRenderer {
     }
 
     for (const feature of documentData.plan.features ?? []) {
+      if (feature.kind === "column") continue;
       const placementUncertain = feature.placementQuality ? feature.placementQuality !== "confirmed" : Boolean(feature.uncertain);
       const group = svg("g", { class: `feature ${placementUncertain ? "placement-uncertain" : ""} ${this.isSelectable("equipment") ? "" : "not-selectable"}` });
       const rect = svg("rect", { class: `feature-shape ${placementUncertain ? "placement-uncertain" : ""}`, x: feature.x, y: feature.y, width: feature.width, height: feature.height, rx: 4, tabindex: 0, role: "button", "aria-label": feature.name });
@@ -254,12 +255,17 @@ export class PlanRenderer {
       const placement = analyzeFurniturePlacement(furniture, room);
       const conflicts = analyzeFurnitureConflicts(furniture, documentData.plan);
       const selected = furniture.id === this.selectedFurnitureId;
-      const group = svg("g", { class: `furniture-group ${furniture.supportId ? "is-supported" : ""} ${this.isSelectable("furniture") ? "" : "not-selectable"} ${selected ? "selected" : ""} ${placement.inside ? "" : "out-of-room"} ${conflicts.length ? "has-conflict" : ""}`, "data-furniture-id": furniture.id, tabindex: 0, role: "button", "aria-label": `${furniture.name}${furniture.supportId ? " 上置き" : ""}${placement.inside ? "" : " 部屋外"}${conflicts.length ? " 重なりあり" : ""}` });
+      const support = findSupportItem(documentData.plan, furniture.supportId);
+      const supportWidth = support?.widthCm ?? support?.width;
+      const supportDepth = support?.depthCm ?? support?.height;
+      const supportedMovable = support && supportWidth >= furniture.widthCm && supportDepth >= furniture.depthCm;
+      const group = svg("g", { class: `furniture-group ${furniture.supportId ? "is-supported" : ""} ${furniture.supportId && !supportedMovable ? "is-supported-fixed" : ""} ${this.isSelectable("furniture") ? "" : "not-selectable"} ${selected ? "selected" : ""} ${placement.inside ? "" : "out-of-room"} ${conflicts.length ? "has-conflict" : ""}`, "data-furniture-id": furniture.id, tabindex: 0, role: "button", "aria-label": `${furniture.name}${furniture.supportId ? " 上置き" : ""}${placement.inside ? "" : " 部屋外"}${conflicts.length ? " 重なりあり" : ""}` });
       const rect = svg("rect", { class: "furniture-shape", x: furniture.x, y: furniture.y, width: furniture.widthCm, height: furniture.depthCm, rx: 5 });
       const label = svg("text", { class: "furniture-label", x: furniture.x + furniture.widthCm / 2, y: furniture.y + furniture.depthCm / 2 - 7 }, furniture.name);
       const sizeLabel = svg("text", { class: "furniture-size-label", x: furniture.x + furniture.widthCm / 2, y: furniture.y + furniture.depthCm / 2 + 10 }, `${furniture.widthCm}×${furniture.depthCm}`);
       group.append(rect, label, sizeLabel);
-      if (furniture.supportId) group.append(svg("text", { class: "furniture-support-label", x: furniture.x + furniture.widthCm / 2, y: furniture.y + furniture.depthCm - 6 }, "上置き"));
+      const supportLabel = furniture.supportId ? svg("text", { class: "furniture-support-label", x: furniture.x + furniture.widthCm / 2, y: furniture.y + furniture.depthCm - 6 }, "上置き") : null;
+      if (supportLabel) group.append(supportLabel);
       if (selected && placement.inside && placement.boundaries) {
         const centerX = furniture.x + furniture.widthCm / 2;
         const centerY = furniture.y + furniture.depthCm / 2;
@@ -292,11 +298,11 @@ export class PlanRenderer {
         if (this.isSelectable("furniture")) this.onSelect("furniture", furniture);
       });
       group.addEventListener("pointerdown", (event) => {
-        if (this.locked || furniture.supportId || !this.isSelectable("furniture")) return;
+        if (this.locked || (furniture.supportId && !supportedMovable) || !this.isSelectable("furniture")) return;
         event.stopPropagation();
         event.currentTarget.setPointerCapture?.(event.pointerId);
         this.draggingFurniture = {
-          furniture, rect, label, sizeLabel,
+          furniture, rect, label, sizeLabel, supportLabel, support,
           clientX: event.clientX, clientY: event.clientY,
           startX: furniture.x, startY: furniture.y,
           moved: false,
@@ -583,14 +589,27 @@ export class PlanRenderer {
         const viewport = this.svg.viewBox.baseVal;
         const dx = (event.clientX - drag.clientX) * viewport.width / rect.width / this.transform.scale;
         const dy = (event.clientY - drag.clientY) * viewport.height / rect.height / this.transform.scale;
-        drag.furniture.x = this.snapEnabled ? snapToGrid(drag.startX + dx) : drag.startX + dx;
-        drag.furniture.y = this.snapEnabled ? snapToGrid(drag.startY + dy) : drag.startY + dy;
+        if (drag.support) {
+          const supportWidth = drag.support.widthCm ?? drag.support.width;
+          const supportDepth = drag.support.depthCm ?? drag.support.height;
+          drag.furniture.x = Math.max(drag.support.x, Math.min(drag.support.x + supportWidth - drag.furniture.widthCm, drag.startX + dx));
+          drag.furniture.y = Math.max(drag.support.y, Math.min(drag.support.y + supportDepth - drag.furniture.depthCm, drag.startY + dy));
+          drag.furniture.supportOffsetX = drag.furniture.x - drag.support.x;
+          drag.furniture.supportOffsetY = drag.furniture.y - drag.support.y;
+        } else {
+          drag.furniture.x = this.snapEnabled ? snapToGrid(drag.startX + dx) : drag.startX + dx;
+          drag.furniture.y = this.snapEnabled ? snapToGrid(drag.startY + dy) : drag.startY + dy;
+        }
         drag.rect.setAttribute("x", drag.furniture.x);
         drag.rect.setAttribute("y", drag.furniture.y);
         drag.label.setAttribute("x", drag.furniture.x + drag.furniture.widthCm / 2);
         drag.label.setAttribute("y", drag.furniture.y + drag.furniture.depthCm / 2 - 7);
         drag.sizeLabel.setAttribute("x", drag.furniture.x + drag.furniture.widthCm / 2);
         drag.sizeLabel.setAttribute("y", drag.furniture.y + drag.furniture.depthCm / 2 + 10);
+        if (drag.supportLabel) {
+          drag.supportLabel.setAttribute("x", drag.furniture.x + drag.furniture.widthCm / 2);
+          drag.supportLabel.setAttribute("y", drag.furniture.y + drag.furniture.depthCm - 6);
+        }
         return;
       }
       if (this.draggingDimension) {

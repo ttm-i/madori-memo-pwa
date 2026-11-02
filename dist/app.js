@@ -1,7 +1,7 @@
-import { deleteActivePlan, loadActivePlan, saveActivePlan } from "./db.js?v=47";
-import { alignFurnitureToSupport, alignSupportedFurniture, analyzeDeliveryRoute, analyzeFurnitureConflicts, analyzeFurniturePlacement, buildElevationItems, buildRoomWalls, buildWallDiagram, countQualities, createSamplePlan, DIMENSION_GROUP_LABELS, duplicateFurniture, findSupportItem, getDimensionGroup, getElectricalPlanPosition, resolveFurnitureVerticalRange, rotateFurniture, updateFurniture, validatePlan, wallDisplayWidth } from "./model.js?v=47";
-import { detailMarkup, measurementMetrics, PlanRenderer } from "./renderer.js?v=47";
-import { renderThreeView } from "./three.js?v=47";
+import { deleteActivePlan, loadActivePlan, saveActivePlan } from "./db.js?v=48";
+import { alignFurnitureToSupport, alignSupportedFurniture, analyzeDeliveryRoute, analyzeFurnitureConflicts, analyzeFurniturePlacement, buildElevationItems, buildRoomWalls, buildWallDiagram, countQualities, createSamplePlan, DIMENSION_GROUP_LABELS, duplicateFurniture, findSupportItem, getDimensionGroup, getElectricalPlanPosition, resolveFurnitureVerticalRange, rotateFurniture, updateFurniture, validatePlan, wallDisplayWidth } from "./model.js?v=48";
+import { detailMarkup, measurementMetrics, PlanRenderer } from "./renderer.js?v=48";
+import { renderThreeView } from "./three.js?v=48";
 
 const elements = Object.fromEntries([
   "menuButton", "dataMenu", "detailDialog", "detailType", "detailTitle", "detailBody", "fileInput",
@@ -143,7 +143,7 @@ function updateFurnitureSupportOptions(selectedId = "") {
     group.append(...items.map((item) => new Option(item.name, item.id)));
     options.push(group);
   };
-  appendGroup("固定設備の上", (activePlan?.plan.features ?? []).filter((item) => item.roomId === roomId));
+  appendGroup("固定設備の上", (activePlan?.plan.features ?? []).filter((item) => item.kind !== "column" && item.roomId === roomId));
   appendGroup("家具の上", (activePlan?.plan.furniture ?? []).filter((item) => item.roomId === roomId && !excluded.has(item.id)));
   elements.furnitureSupport.replaceChildren(...options);
   elements.furnitureSupport.value = [...elements.furnitureSupport.options].some((option) => option.value === selectedId) ? selectedId : "";
@@ -610,6 +610,7 @@ function updateDimensionFilters() {
 
 async function setActivePlan(plan, { persist = true } = {}) {
   activePlan = plan;
+  activePlan.plan.features = (activePlan.plan.features ?? []).filter((feature) => feature.kind !== "column");
   alignSupportedFurniture(activePlan.plan);
   history.length = 0;
   updateUndoButton();
@@ -868,7 +869,7 @@ elements.furnitureRoom.addEventListener("change", () => updateFurnitureSupportOp
 elements.furnitureSupport.addEventListener("change", () => {
   const support = findSupportItem(activePlan?.plan, elements.furnitureSupport.value);
   elements.furnitureSupportHelp.textContent = support
-    ? `${support.name}の中央に配置し、上端から高さを計算します。`
+    ? `${support.name}の上端から高さを計算し、上面からはみ出さない範囲で移動できます。`
     : "設備や家具の上に置く場合、平面上の位置と3Dの高さを連動します。";
 });
 elements.cancelFurnitureButton.addEventListener("click", () => {
@@ -987,7 +988,11 @@ elements.deleteFurnitureButton.addEventListener("click", async () => {
   if (!furniture || !confirm(`「${furniture.name}」を削除しますか？`)) return;
   pushHistory();
   activePlan.plan.furniture = activePlan.plan.furniture.filter((item) => item.id !== furniture.id);
-  for (const item of activePlan.plan.furniture) if (item.supportId === furniture.id) delete item.supportId;
+  for (const item of activePlan.plan.furniture) if (item.supportId === furniture.id) {
+    delete item.supportId;
+    delete item.supportOffsetX;
+    delete item.supportOffsetY;
+  }
   await commitFurnitureChange("家具を削除しました");
 });
 elements.furnitureRoomEdit.addEventListener("change", async () => {
