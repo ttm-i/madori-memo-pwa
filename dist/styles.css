@@ -224,6 +224,14 @@ button { color: inherit; touch-action: manipulation; }
 .three-options input { accent-color: var(--accent); }
 .three-canvas-frame { position: relative; overflow: hidden; border: 1px solid var(--line); border-radius: 20px; background: linear-gradient(#f7f4ec,#e8e4da); box-shadow: inset 0 1px 0 rgba(255,255,255,.8); }
 #threeCanvas { display: block; width: 100%; height: auto; min-height: 430px; }
+#threeCanvas.is-zoomed { cursor: grab; touch-action: none; }
+#threeCanvas.is-zoomed:active { cursor: grabbing; }
+.three-viewport-controls { position: absolute; z-index: 3; top: 10px; right: 10px; display: grid; grid-template-columns: 34px 54px 34px; overflow: hidden; border: 1px solid var(--line); border-radius: 11px; background: rgba(255,255,255,.9); box-shadow: 0 3px 12px rgba(55,51,43,.12); }
+.three-viewport-controls button { min-height: 34px; padding: 0; border: 0; border-right: 1px solid var(--line); background: transparent; color: var(--accent); font-size: 1rem; font-weight: 800; }
+.three-viewport-controls button:last-child { border-right: 0; }
+.three-viewport-controls button:disabled { color: #aaa89f; }
+.three-viewport-controls span { font-size: .64rem; }
+.three-zoom-hint { position: absolute; z-index: 2; right: 11px; top: 51px; padding: 4px 7px; border-radius: 7px; background: rgba(62,70,65,.76); color: white; font-size: .58rem; pointer-events: none; }
 .three-floor { stroke: #8d9188; stroke-width: 2; }
 .three-room-label { fill: #646a63; font-size: 14px; font-weight: 800; text-anchor: middle; paint-order: stroke; stroke: rgba(255,255,255,.8); stroke-width: 5px; }
 .three-wall { fill: #e0dcd2; }

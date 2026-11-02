@@ -1,4 +1,4 @@
-import { buildKitchenComponentRects, featureSupportRange, pointInPolygon, resolveFurnitureVerticalRange } from "./model.js?v=59";
+import { buildKitchenComponentRects, featureSupportRange, pointInPolygon, resolveFurnitureVerticalRange } from "./model.js?v=60";
 
 const NS = "http://www.w3.org/2000/svg";
 
@@ -26,6 +26,17 @@ export function projectThreePoint(point, bounds, quarterTurn = 0, z = 0) {
 export function projectThreeDepth(point, bounds, quarterTurn = 0, z = 0) {
   const { x, y } = rotatedThreeCoordinates(point, bounds, quarterTurn);
   return (x + y) * .4464 + z * .5184;
+}
+
+export function threeViewportBox({ scale = 1, panX = 0, panY = 0 } = {}) {
+  const safeScale = Math.max(1, Math.min(3, Number.isFinite(scale) ? scale : 1));
+  const width = 900 / safeScale;
+  const height = 620 / safeScale;
+  const maxPanX = (900 - width) / 2;
+  const maxPanY = (620 - height) / 2;
+  const safePanX = Math.max(-maxPanX, Math.min(maxPanX, Number.isFinite(panX) ? panX : 0));
+  const safePanY = Math.max(-maxPanY, Math.min(maxPanY, Number.isFinite(panY) ? panY : 0));
+  return { x: 450 + safePanX - width / 2, y: 310 + safePanY - height / 2, width, height, scale: safeScale, panX: safePanX, panY: safePanY };
 }
 
 function pointsValue(points) { return points.map((point) => `${point.x},${point.y}`).join(" "); }

@@ -10,7 +10,7 @@
     <meta name="description" content="間取りと家具寸法を端末内だけで確認するオフラインPWA" />
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" href="./icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="./styles.css?v=59" />
+    <link rel="stylesheet" href="./styles.css?v=60" />
     <title>間取りメモ</title>
   </head>
   <body>
@@ -232,6 +232,12 @@
           </div>
           <div class="three-canvas-frame">
             <svg id="threeCanvas" viewBox="0 0 900 620" role="img" aria-label="間取りの概略3D"></svg>
+            <div class="three-viewport-controls" aria-label="3Dの拡大と縮小">
+              <button id="threeZoomOut" type="button" aria-label="3Dを縮小">−</button>
+              <button id="threeZoomReset" type="button" aria-label="3Dを全体表示"><span id="threeZoomValue">100%</span></button>
+              <button id="threeZoomIn" type="button" aria-label="3Dを拡大">＋</button>
+            </div>
+            <span id="threeZoomHint" class="three-zoom-hint" hidden>ドラッグで表示位置を移動</span>
             <div id="threeEmpty" class="wall-empty"><strong>間取りデータがありません</strong><span>JSONを読み込むと概略3Dを表示します。</span></div>
           </div>
           <div class="three-legend"><span><i class="three-legend-wall"></i>壁（模式高さ）</span><span><i class="three-legend-door"></i>ドア</span><span><i class="three-legend-window"></i>窓</span><span><i class="three-legend-feature"></i>設備</span><span><i class="three-legend-furniture"></i>家具</span></div>
@@ -345,7 +351,7 @@
       <input id="fileInput" type="file" accept="application/json,.json" hidden />
       <div id="toast" class="toast" role="status" aria-live="polite"></div>
     </div>
-    <script type="module" src="./app.js?v=59"></script>
+    <script type="module" src="./app.js?v=60"></script>
   </body>
 </html>
 

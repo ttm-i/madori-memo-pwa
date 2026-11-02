@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { alignFurnitureToSupport, analyzeDeliveryRoute, analyzeFurnitureConflicts, analyzeFurniturePlacement, buildElevationItems, buildKitchenComponentRects, buildRoomWalls, buildWallDiagram, countQualities, createSamplePlan, duplicateFurniture, findDeliveryDoorPath, fitsRectangle, FORMAT, getDimensionGroup, getElectricalPlanPosition, moveDimensionGuide, pointInPolygon, rectangleIntersectsPolygon, rectanglesOverlap, resolveFurnitureElevationPlacement, resolveFurnitureVerticalRange, rotateFurniture, snapToGrid, updateFurniture, validatePlan, wallDisplayWidth } from "../dist/model.js";
 import { detailMarkup, gestureExceedsTapThreshold, measurementMetrics, PlanRenderer, snapMeasurementPoint, zoomTransformAround } from "../dist/renderer.js";
-import { featureVerticalRange, isCutawayEdge, openingVerticalRange, projectThreeDepth, projectThreePoint, splitWallFace, subdivideVerticalRange, subdivideWallRectangle, subdivideWallRectangleTiles, subdivideWallSegment, threeItemBelongsToRoom, threeLayerEnabled, threeRoomBounds, threeSelectableType, threeWallBelongsToRoom, visibleBoxSideIndexes } from "../dist/three.js";
+import { featureVerticalRange, isCutawayEdge, openingVerticalRange, projectThreeDepth, projectThreePoint, splitWallFace, subdivideVerticalRange, subdivideWallRectangle, subdivideWallRectangleTiles, subdivideWallSegment, threeItemBelongsToRoom, threeLayerEnabled, threeRoomBounds, threeSelectableType, threeViewportBox, threeWallBelongsToRoom, visibleBoxSideIndexes } from "../dist/three.js";
 
 test("sample plan conforms to the public schema", () => {
   const sample = createSamplePlan();
@@ -353,6 +353,12 @@ test("3D overview projection rotates the plan without changing its scale", () =>
   assert.deepEqual(rotated, { x: -72, y: 36 });
   assert.equal(projectThreePoint({ x: 300, y: 150 }, bounds, 0, 100).y, -26);
   assert.ok(projectThreeDepth({ x: 300, y: 150 }, bounds, 0, 100) > projectThreeDepth({ x: 300, y: 150 }, bounds, 0, 0));
+});
+
+test("3D viewport zoom stays inside the rendered scene", () => {
+  assert.deepEqual(threeViewportBox(), { x: 0, y: 0, width: 900, height: 620, scale: 1, panX: 0, panY: 0 });
+  assert.deepEqual(threeViewportBox({ scale: 2, panX: 999, panY: -999 }), { x: 450, y: 0, width: 450, height: 310, scale: 2, panX: 225, panY: -155 });
+  assert.equal(threeViewportBox({ scale: 9 }).scale, 3);
 });
 
 test("3D layers default to visible and can be independently hidden", () => {
