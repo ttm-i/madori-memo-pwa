@@ -34,6 +34,7 @@ export function openingVerticalRange(opening) {
 }
 
 export function featureVerticalRange(feature) {
+  if (feature?.kind === "washer-pan") return { bottomCm: 0, topCm: 4, schematic: true };
   if (Number.isFinite(feature?.bottomHeightCm) && Number.isFinite(feature?.topHeightCm)) {
     return { bottomCm: feature.bottomHeightCm, topCm: feature.topHeightCm, schematic: false };
   }
@@ -179,6 +180,20 @@ export function renderThreeView(canvas, documentData, options = {}, onOpeningSel
       }
     });
   }
+  for (const wall of plan.walls ?? []) {
+    if (!wall.from || !wall.to) continue;
+    const bottomA = project(wall.from); const bottomB = project(wall.to);
+    const topA = project(wall.from, wallDisplayHeight); const topB = project(wall.to, wallDisplayHeight);
+    surfaces.push({
+      depth: (bottomA.y + bottomB.y) / 2,
+      order: .5,
+      element: svg("polygon", {
+        class: "three-wall three-partition-wall",
+        points: pointsValue([bottomA, bottomB, topB, topA]),
+        "data-wall-id": wall.id ?? "",
+      }),
+    });
+  }
   for (const { opening, range } of drawableOpenings) {
     if (cutaway && openingIsOnCutawayEdge(opening, plan.rooms ?? [], quarterTurn)) continue;
     const bottomFrom = project(opening.from, range.bottomCm);
@@ -233,6 +248,7 @@ export function renderThreeView(canvas, documentData, options = {}, onOpeningSel
     cutOpeningCount: cutOpeningIds.size,
     wallDisplayHeight,
     hiddenWallCount,
+    partitionWallCount: (plan.walls ?? []).filter((wall) => wall.from && wall.to).length,
     furnitureWithoutHeight: (plan.furniture ?? []).filter((item) => !Number.isFinite(item.heightCm)).length,
   };
 }

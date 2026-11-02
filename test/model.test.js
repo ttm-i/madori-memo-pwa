@@ -336,6 +336,7 @@ test("3D equipment uses measured vertical ranges without making tall closets opa
   assert.deepEqual(featureVerticalRange({ kind: "closet", derivedInteriorHeightCm: 232 }), { bottomCm: 0, topCm: 232, schematic: false });
   assert.deepEqual(featureVerticalRange({ kind: "cabinet", bottomHeightCm: 8, topHeightCm: 112 }), { bottomCm: 8, topCm: 112, schematic: false });
   assert.deepEqual(featureVerticalRange({ kind: "counter", undersideHeightCm: 90, derivedTopHeightCm: 91.5 }), { bottomCm: 90, topCm: 91.5, schematic: false });
+  assert.deepEqual(featureVerticalRange({ kind: "washer-pan" }), { bottomCm: 0, topCm: 4, schematic: true });
   assert.deepEqual(featureVerticalRange({ kind: "unknown" }), { bottomCm: 0, topCm: 55, schematic: true });
 });
 

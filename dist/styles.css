@@ -222,6 +222,7 @@ button { color: inherit; touch-action: manipulation; }
 .three-floor { stroke: #8d9188; stroke-width: 2; }
 .three-room-label { fill: #646a63; font-size: 14px; font-weight: 800; text-anchor: middle; paint-order: stroke; stroke: rgba(255,255,255,.8); stroke-width: 5px; }
 .three-wall { fill: rgba(224,220,210,.92); stroke: #777d75; stroke-width: 1.5; }
+.three-partition-wall { fill: rgba(215,210,199,.62); stroke: #696f68; stroke-dasharray: 4 2; }
 .three-opening { cursor: pointer; stroke-width: 2.5; vector-effect: non-scaling-stroke; }
 .three-opening-door { fill: rgba(247,242,232,.08); stroke: #8a6848; }
 .three-opening-window { fill: rgba(130,196,219,.62); stroke: #41778b; }
@@ -232,6 +233,8 @@ button { color: inherit; touch-action: manipulation; }
 .three-box-kind-closet.three-box-top { fill: rgba(94,145,127,.08); }
 .three-box-kind-cabinet { fill: rgba(94,145,127,.4); }
 .three-box-kind-counter { fill: rgba(94,145,127,.55); }
+.three-box-kind-washer-pan { fill: rgba(94,145,127,.68); stroke: #467865; }
+.three-box-kind-washer-pan.three-box-side { filter: none; }
 .three-box-furniture { fill: rgba(183,126,86,.72); stroke: #915f3f; }
 .three-box-side { filter: brightness(.88); }
 .three-object-label { fill: #333934; font-size: 11px; font-weight: 800; text-anchor: middle; paint-order: stroke; stroke: rgba(255,255,255,.88); stroke-width: 4px; }
