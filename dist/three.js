@@ -59,6 +59,50 @@ function pointToSegmentDistance(point, from, to) {
   return Math.hypot(point.x - (from.x + dx * ratio), point.y - (from.y + dy * ratio));
 }
 
+export function splitWallFace(width, height, cuts) {
+  let rectangles = [{ u1: 0, u2: width, z1: 0, z2: height }];
+  for (const raw of cuts) {
+    const cut = {
+      u1: Math.max(0, Math.min(width, Math.min(raw.u1, raw.u2))),
+      u2: Math.max(0, Math.min(width, Math.max(raw.u1, raw.u2))),
+      z1: Math.max(0, Math.min(height, Math.min(raw.z1, raw.z2))),
+      z2: Math.max(0, Math.min(height, Math.max(raw.z1, raw.z2))),
+    };
+    if (cut.u2 - cut.u1 < .1 || cut.z2 - cut.z1 < .1) continue;
+    rectangles = rectangles.flatMap((rectangle) => {
+      const u1 = Math.max(rectangle.u1, cut.u1); const u2 = Math.min(rectangle.u2, cut.u2);
+      const z1 = Math.max(rectangle.z1, cut.z1); const z2 = Math.min(rectangle.z2, cut.z2);
+      if (u2 <= u1 || z2 <= z1) return [rectangle];
+      return [
+        { u1: rectangle.u1, u2: u1, z1: rectangle.z1, z2: rectangle.z2 },
+        { u1: u2, u2: rectangle.u2, z1: rectangle.z1, z2: rectangle.z2 },
+        { u1, u2, z1: rectangle.z1, z2: z1 },
+        { u1, u2, z1: z2, z2: rectangle.z2 },
+      ].filter((item) => item.u2 - item.u1 > .1 && item.z2 - item.z1 > .1);
+    });
+  }
+  return rectangles;
+}
+
+function openingCutForEdge(opening, room, edgeIndex, wallHeight) {
+  const roomIds = opening.roomIds ?? [opening.roomId];
+  if (!roomIds.includes(room.id)) return null;
+  const range = openingVerticalRange(opening);
+  if (!range) return null;
+  const from = room.points[edgeIndex]; const to = room.points[(edgeIndex + 1) % room.points.length];
+  const dx = to.x - from.x; const dy = to.y - from.y; const length = Math.hypot(dx, dy);
+  const openingDx = opening.to.x - opening.from.x; const openingDy = opening.to.y - opening.from.y;
+  const openingLength = Math.hypot(openingDx, openingDy);
+  if (!length || !openingLength || Math.abs(dx * openingDy - dy * openingDx) / (length * openingLength) > .08) return null;
+  const midpoint = { x: (opening.from.x + opening.to.x) / 2, y: (opening.from.y + opening.to.y) / 2 };
+  if (pointToSegmentDistance(midpoint, from, to) > 25) return null;
+  const position = (point) => ((point.x - from.x) * dx + (point.y - from.y) * dy) / length;
+  const u1 = Math.max(0, Math.min(length, Math.min(position(opening.from), position(opening.to))));
+  const u2 = Math.max(0, Math.min(length, Math.max(position(opening.from), position(opening.to))));
+  if (u2 - u1 < 1) return null;
+  return { u1, u2, z1: range.bottomCm, z2: Math.min(wallHeight, range.topCm), opening };
+}
+
 function openingIsOnCutawayEdge(opening, rooms, quarterTurn) {
   const roomIds = opening.roomIds ?? [opening.roomId];
   const room = rooms.find((candidate) => roomIds.includes(candidate.id));
@@ -98,6 +142,7 @@ export function renderThreeView(canvas, documentData, options = {}, onOpeningSel
   const labelLayer = svg("g", { class: "three-label-layer" });
   const surfaces = [];
   let hiddenWallCount = 0;
+  const cutOpeningIds = new Set();
   for (const room of plan.rooms ?? []) {
     floorLayer.append(svg("polygon", { class: "three-floor", points: pointsValue(room.points.map((point) => project(point))), fill: room.color ?? "#e9e4d8" }));
     const labelPoint = project(room.label ?? room.points[0]);
@@ -106,9 +151,19 @@ export function renderThreeView(canvas, documentData, options = {}, onOpeningSel
       if (room.nonWallEdges?.includes(index)) return;
       if (cutaway && isCutawayEdge(room.points, index, quarterTurn)) { hiddenWallCount += 1; return; }
       const to = room.points[(index + 1) % room.points.length];
-      const bottomA = project(from); const bottomB = project(to);
-      const topA = project(from, wallDisplayHeight); const topB = project(to, wallDisplayHeight);
-      surfaces.push({ depth: (bottomA.y + bottomB.y) / 2, order: 0, element: svg("polygon", { class: "three-wall", points: pointsValue([bottomA, bottomB, topB, topA]) }) });
+      const length = Math.hypot(to.x - from.x, to.y - from.y);
+      if (!length) return;
+      const cuts = drawableOpenings.map(({ opening }) => openingCutForEdge(opening, room, index, wallDisplayHeight)).filter(Boolean);
+      cuts.forEach((cut) => cutOpeningIds.add(cut.opening.id));
+      const pointAt = (u) => ({ x: from.x + (to.x - from.x) * u / length, y: from.y + (to.y - from.y) * u / length });
+      for (const rectangle of splitWallFace(length, wallDisplayHeight, cuts)) {
+        const bottomA = project(pointAt(rectangle.u1), rectangle.z1);
+        const bottomB = project(pointAt(rectangle.u2), rectangle.z1);
+        const topB = project(pointAt(rectangle.u2), rectangle.z2);
+        const topA = project(pointAt(rectangle.u1), rectangle.z2);
+        const depthA = project(pointAt(rectangle.u1)).y; const depthB = project(pointAt(rectangle.u2)).y;
+        surfaces.push({ depth: (depthA + depthB) / 2, order: 0, element: svg("polygon", { class: "three-wall", points: pointsValue([bottomA, bottomB, topB, topA]) }) });
+      }
     });
   }
   for (const { opening, range } of drawableOpenings) {
@@ -160,6 +215,7 @@ export function renderThreeView(canvas, documentData, options = {}, onOpeningSel
   return {
     rendered: true,
     openingCount: drawableOpenings.length,
+    cutOpeningCount: cutOpeningIds.size,
     wallDisplayHeight,
     hiddenWallCount,
     furnitureWithoutHeight: (plan.furniture ?? []).filter((item) => !Number.isFinite(item.heightCm)).length,

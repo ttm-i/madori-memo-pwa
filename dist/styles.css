@@ -223,7 +223,7 @@ button { color: inherit; touch-action: manipulation; }
 .three-room-label { fill: #646a63; font-size: 14px; font-weight: 800; text-anchor: middle; paint-order: stroke; stroke: rgba(255,255,255,.8); stroke-width: 5px; }
 .three-wall { fill: rgba(224,220,210,.92); stroke: #777d75; stroke-width: 1.5; }
 .three-opening { cursor: pointer; stroke-width: 2.5; vector-effect: non-scaling-stroke; }
-.three-opening-door { fill: rgba(247,242,232,.96); stroke: #8a6848; }
+.three-opening-door { fill: rgba(247,242,232,.08); stroke: #8a6848; }
 .three-opening-window { fill: rgba(130,196,219,.62); stroke: #41778b; }
 .three-opening:focus { outline: none; stroke: var(--accent); stroke-width: 4; }
 .three-box { stroke-width: 1.5; }

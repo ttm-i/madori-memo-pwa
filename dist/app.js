@@ -1,7 +1,7 @@
-import { deleteActivePlan, loadActivePlan, saveActivePlan } from "./db.js?v=43";
-import { analyzeDeliveryRoute, analyzeFurnitureConflicts, analyzeFurniturePlacement, buildElevationItems, buildRoomWalls, buildWallDiagram, countQualities, createSamplePlan, DIMENSION_GROUP_LABELS, duplicateFurniture, getDimensionGroup, getElectricalPlanPosition, rotateFurniture, updateFurniture, validatePlan, wallDisplayWidth } from "./model.js?v=43";
-import { detailMarkup, measurementMetrics, PlanRenderer } from "./renderer.js?v=43";
-import { renderThreeView } from "./three.js?v=43";
+import { deleteActivePlan, loadActivePlan, saveActivePlan } from "./db.js?v=44";
+import { analyzeDeliveryRoute, analyzeFurnitureConflicts, analyzeFurniturePlacement, buildElevationItems, buildRoomWalls, buildWallDiagram, countQualities, createSamplePlan, DIMENSION_GROUP_LABELS, duplicateFurniture, getDimensionGroup, getElectricalPlanPosition, rotateFurniture, updateFurniture, validatePlan, wallDisplayWidth } from "./model.js?v=44";
+import { detailMarkup, measurementMetrics, PlanRenderer } from "./renderer.js?v=44";
+import { renderThreeView } from "./three.js?v=44";
 
 const elements = Object.fromEntries([
   "menuButton", "dataMenu", "detailDialog", "detailType", "detailTitle", "detailBody", "fileInput",
@@ -62,7 +62,7 @@ function updateThreeView() {
     cutaway: threeCutaway,
     showLabels: threeShowLabels,
   }, (opening) => showDetail("opening", opening));
-  const notes = [`ドア・窓 ${result.openingCount}点は実測高さを反映。壁上端は天井位置ではありません。`];
+  const notes = [`ドア・窓 ${result.openingCount}点のうち ${result.cutOpeningCount}点を壁の開口として反映。壁上端は天井位置ではありません。`];
   notes.push(result.furnitureWithoutHeight
     ? `高さ未登録の家具 ${result.furnitureWithoutHeight}点は、位置確認用の低い箱として表示しています。`
     : "家具の高さデータを反映しています。");
