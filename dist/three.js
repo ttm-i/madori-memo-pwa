@@ -1,4 +1,4 @@
-import { buildKitchenComponentRects, featureSupportRange, pointInPolygon, resolveFurnitureVerticalRange } from "./model.js?v=58";
+import { buildKitchenComponentRects, featureSupportRange, pointInPolygon, resolveFurnitureVerticalRange } from "./model.js?v=59";
 
 const NS = "http://www.w3.org/2000/svg";
 
@@ -439,27 +439,8 @@ export function renderThreeView(canvas, documentData, options = {}, onSelect = n
     const className = `three-box three-box-${item.type}${kindClass}${item.vertical.schematic ? " is-schematic" : ""}`;
     for (const index of visibleBoxSideIndexes(depthBase)) {
       const next = (index + 1) % bottom.length;
-      for (const segment of subdivideWallSegment(base[index], base[next], 35, 0)) {
-        for (const row of subdivideVerticalRange(item.vertical.bottomCm, item.vertical.topCm, 45, 0)) {
-          const tile = svg("polygon", {
-            class: `${className} three-box-side three-box-side-tile`,
-            points: pointsValue([
-              project(segment.from, row.z1), project(segment.to, row.z1),
-              project(segment.to, row.z2), project(segment.from, row.z2),
-            ]),
-          });
-          surfaces.push({
-            depth: averageDepth([
-              { point: segment.from, z: row.z1 }, { point: segment.to, z: row.z1 },
-              { point: segment.to, z: row.z2 }, { point: segment.from, z: row.z2 },
-            ]),
-            order: 2,
-            element: makeBoxSurfaceInteractive(tile, item, onSelect),
-          });
-        }
-      }
-      const outline = svg("polygon", {
-        class: `${className} three-box-side-outline`,
+      const side = svg("polygon", {
+        class: `${className} three-box-side`,
         points: pointsValue([bottom[index], bottom[next], top[next], top[index]]),
       });
       surfaces.push({
@@ -467,8 +448,8 @@ export function renderThreeView(canvas, documentData, options = {}, onSelect = n
           { point: base[index], z: item.vertical.bottomCm }, { point: base[next], z: item.vertical.bottomCm },
           { point: base[next], z: item.vertical.topCm }, { point: base[index], z: item.vertical.topCm },
         ]),
-        order: 2.5,
-        element: outline,
+        order: 2,
+        element: makeBoxSurfaceInteractive(side, item, onSelect),
       });
     }
     const topDepth = base.reduce((sum, point) => sum + depthAt(point, item.vertical.topCm), 0) / base.length;

@@ -1,4 +1,4 @@
-import { analyzeFurnitureConflicts, analyzeFurniturePlacement, buildKitchenComponentRects, findSupportItem, getDimensionGroup, getElectricalPlanPosition, moveDimensionGuide, QUALITY_LABELS, snapToGrid } from "./model.js?v=58";
+import { analyzeFurnitureConflicts, analyzeFurniturePlacement, buildKitchenComponentRects, findSupportItem, getDimensionGroup, getElectricalPlanPosition, moveDimensionGuide, QUALITY_LABELS, snapToGrid } from "./model.js?v=59";
 
 const NS = "http://www.w3.org/2000/svg";
 
