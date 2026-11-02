@@ -1,4 +1,4 @@
-import { buildKitchenComponentRects, featureSupportRange, pointInPolygon, resolveFurnitureVerticalRange } from "./model.js?v=57";
+import { buildKitchenComponentRects, featureSupportRange, pointInPolygon, resolveFurnitureVerticalRange } from "./model.js?v=58";
 
 const NS = "http://www.w3.org/2000/svg";
 
@@ -9,24 +9,34 @@ function svg(name, attributes = {}, text = "") {
   return element;
 }
 
-export function projectThreePoint(point, bounds, quarterTurn = 0, z = 0) {
+function rotatedThreeCoordinates(point, bounds, quarterTurn = 0) {
   const cx = bounds.x + bounds.width / 2;
   const cy = bounds.y + bounds.height / 2;
   let x = point.x - cx;
   let y = point.y - cy;
   for (let index = 0; index < ((quarterTurn % 4) + 4) % 4; index += 1) [x, y] = [-y, x];
+  return { x, y };
+}
+
+export function projectThreePoint(point, bounds, quarterTurn = 0, z = 0) {
+  const { x, y } = rotatedThreeCoordinates(point, bounds, quarterTurn);
   return { x: (x - y) * .72, y: (x + y) * .36 - z * .62 };
+}
+
+export function projectThreeDepth(point, bounds, quarterTurn = 0, z = 0) {
+  const { x, y } = rotatedThreeCoordinates(point, bounds, quarterTurn);
+  return (x + y) * .4464 + z * .5184;
 }
 
 function pointsValue(points) { return points.map((point) => `${point.x},${point.y}`).join(" "); }
 
-function wallStripElement(points, { first = true, last = true, partition = false, wallId = "" } = {}) {
+function wallStripElement(points, { first = true, last = true, bottomEdge = true, topEdge = true, partition = false, wallId = "" } = {}) {
   const group = svg("g", { class: "three-wall-surface", "data-wall-id": wallId });
   const variant = partition ? " three-partition-wall" : "";
   group.append(svg("polygon", { class: `three-wall three-wall-fill${variant}`, points: pointsValue(points) }));
   const edgeClass = `three-wall-edge${partition ? " three-partition-wall-edge" : ""}`;
-  group.append(svg("polyline", { class: edgeClass, points: pointsValue([points[0], points[1]]) }));
-  group.append(svg("polyline", { class: edgeClass, points: pointsValue([points[3], points[2]]) }));
+  if (bottomEdge) group.append(svg("polyline", { class: edgeClass, points: pointsValue([points[0], points[1]]) }));
+  if (topEdge) group.append(svg("polyline", { class: edgeClass, points: pointsValue([points[3], points[2]]) }));
   if (first) group.append(svg("polyline", { class: edgeClass, points: pointsValue([points[0], points[3]]) }));
   if (last) group.append(svg("polyline", { class: edgeClass, points: pointsValue([points[1], points[2]]) }));
   return group;
@@ -189,11 +199,28 @@ export function subdivideWallRectangle(rectangle, maxWidth = 35) {
   }));
 }
 
-export function subdivideWallSegment(from, to, maxLength = 35) {
+export function subdivideVerticalRange(bottomCm, topCm, maxHeight = 55, overlapCm = .2) {
+  const height = topCm - bottomCm;
+  const count = Math.max(1, Math.ceil(height / maxHeight));
+  const overlap = Math.min(overlapCm, height / count / 10);
+  return Array.from({ length: count }, (_, index) => ({
+    z1: bottomCm + height * index / count - (index ? overlap : 0),
+    z2: bottomCm + height * (index + 1) / count + (index < count - 1 ? overlap : 0),
+    rowIndex: index,
+    rowCount: count,
+  }));
+}
+
+export function subdivideWallRectangleTiles(rectangle, maxWidth = 35, maxHeight = 55) {
+  return subdivideWallRectangle(rectangle, maxWidth).flatMap((strip) =>
+    subdivideVerticalRange(rectangle.z1, rectangle.z2, maxHeight).map((row) => ({ ...strip, ...row })));
+}
+
+export function subdivideWallSegment(from, to, maxLength = 35, overlapCm = .2) {
   const length = Math.hypot(to.x - from.x, to.y - from.y);
   const count = Math.max(1, Math.ceil(length / maxLength));
   const pointAt = (ratio) => ({ x: from.x + (to.x - from.x) * ratio, y: from.y + (to.y - from.y) * ratio });
-  const overlapRatio = length ? Math.min(.2, length / count / 10) / length : 0;
+  const overlapRatio = length ? Math.min(overlapCm, length / count / 10) / length : 0;
   return Array.from({ length: count }, (_, index) => ({
     from: pointAt(index / count - (index ? overlapRatio : 0)),
     to: pointAt((index + 1) / count + (index < count - 1 ? overlapRatio : 0)),
@@ -269,6 +296,8 @@ export function renderThreeView(canvas, documentData, options = {}, onSelect = n
     const value = projectThreePoint(point, bounds, quarterTurn, z);
     return { x: 450 + value.x * scale, y: 390 + value.y * scale };
   };
+  const depthAt = (point, z = 0) => projectThreeDepth(point, bounds, quarterTurn, z);
+  const averageDepth = (vertices) => vertices.reduce((sum, vertex) => sum + depthAt(vertex.point, vertex.z), 0) / vertices.length;
   const floorLayer = svg("g", { class: "three-floor-layer" });
   const sceneLayer = svg("g", { class: "three-scene-layer" });
   const labelLayer = svg("g", { class: "three-label-layer" });
@@ -289,18 +318,23 @@ export function renderThreeView(canvas, documentData, options = {}, onSelect = n
       const cuts = drawableOpenings.map(({ opening }) => openingCutForEdge(opening, room, index, wallDisplayHeight)).filter(Boolean);
       cuts.forEach((cut) => cutOpeningIds.add(cut.opening.id));
       const pointAt = (u) => ({ x: from.x + (to.x - from.x) * u / length, y: from.y + (to.y - from.y) * u / length });
-      for (const rectangle of splitWallFace(length, wallDisplayHeight, cuts).flatMap((item) => subdivideWallRectangle(item))) {
+      for (const rectangle of splitWallFace(length, wallDisplayHeight, cuts).flatMap((item) => subdivideWallRectangleTiles(item))) {
+        const pointA = pointAt(rectangle.u1); const pointB = pointAt(rectangle.u2);
         const bottomA = project(pointAt(rectangle.u1), rectangle.z1);
         const bottomB = project(pointAt(rectangle.u2), rectangle.z1);
         const topB = project(pointAt(rectangle.u2), rectangle.z2);
         const topA = project(pointAt(rectangle.u1), rectangle.z2);
-        const depthA = project(pointAt(rectangle.u1)).y; const depthB = project(pointAt(rectangle.u2)).y;
         if (showWalls) surfaces.push({
-          depth: (depthA + depthB) / 2,
+          depth: averageDepth([
+            { point: pointA, z: rectangle.z1 }, { point: pointB, z: rectangle.z1 },
+            { point: pointB, z: rectangle.z2 }, { point: pointA, z: rectangle.z2 },
+          ]),
           order: 0,
           element: wallStripElement([bottomA, bottomB, topB, topA], {
             first: rectangle.stripIndex === 0,
             last: rectangle.stripIndex === rectangle.stripCount - 1,
+            bottomEdge: rectangle.rowIndex === 0,
+            topEdge: rectangle.rowIndex === rectangle.rowCount - 1,
           }),
         });
       }
@@ -312,24 +346,30 @@ export function renderThreeView(canvas, documentData, options = {}, onSelect = n
       wall.points.forEach((from, index) => {
         const to = wall.points[(index + 1) % wall.points.length];
         for (const segment of subdivideWallSegment(from, to)) {
-          const bottomA = project(segment.from); const bottomB = project(segment.to);
-          const topA = project(segment.from, wallDisplayHeight); const topB = project(segment.to, wallDisplayHeight);
-          surfaces.push({
-            depth: (bottomA.y + bottomB.y) / 2,
-            order: .5,
-            element: wallStripElement([bottomA, bottomB, topB, topA], {
-              first: segment.stripIndex === 0,
-              last: segment.stripIndex === segment.stripCount - 1,
-              partition: true,
-              wallId: wall.id ?? "",
-            }),
-          });
+          for (const row of subdivideVerticalRange(0, wallDisplayHeight)) {
+            const bottomA = project(segment.from, row.z1); const bottomB = project(segment.to, row.z1);
+            const topA = project(segment.from, row.z2); const topB = project(segment.to, row.z2);
+            surfaces.push({
+              depth: averageDepth([
+                { point: segment.from, z: row.z1 }, { point: segment.to, z: row.z1 },
+                { point: segment.to, z: row.z2 }, { point: segment.from, z: row.z2 },
+              ]),
+              order: .5,
+              element: wallStripElement([bottomA, bottomB, topB, topA], {
+                first: segment.stripIndex === 0,
+                last: segment.stripIndex === segment.stripCount - 1,
+                bottomEdge: row.rowIndex === 0,
+                topEdge: row.rowIndex === row.rowCount - 1,
+                partition: true,
+                wallId: wall.id ?? "",
+              }),
+            });
+          }
         }
       });
-      const base = wall.points.map((point) => project(point));
       const top = wall.points.map((point) => project(point, wallDisplayHeight));
       surfaces.push({
-        depth: base.reduce((sum, point) => sum + point.y, 0) / base.length,
+        depth: wall.points.reduce((sum, point) => sum + depthAt(point, wallDisplayHeight), 0) / wall.points.length,
         order: .75,
         element: svg("polygon", { class: "three-wall three-partition-wall three-wall-volume-top", points: pointsValue(top), "data-wall-id": wall.id ?? "" }),
       });
@@ -337,18 +377,25 @@ export function renderThreeView(canvas, documentData, options = {}, onSelect = n
     }
     if (!wall.from || !wall.to) continue;
     for (const segment of subdivideWallSegment(wall.from, wall.to)) {
-      const bottomA = project(segment.from); const bottomB = project(segment.to);
-      const topA = project(segment.from, wallDisplayHeight); const topB = project(segment.to, wallDisplayHeight);
-      surfaces.push({
-        depth: (bottomA.y + bottomB.y) / 2,
-        order: .5,
-        element: wallStripElement([bottomA, bottomB, topB, topA], {
-          first: segment.stripIndex === 0,
-          last: segment.stripIndex === segment.stripCount - 1,
-          partition: true,
-          wallId: wall.id ?? "",
-        }),
-      });
+      for (const row of subdivideVerticalRange(0, wallDisplayHeight)) {
+        const bottomA = project(segment.from, row.z1); const bottomB = project(segment.to, row.z1);
+        const topA = project(segment.from, row.z2); const topB = project(segment.to, row.z2);
+        surfaces.push({
+          depth: averageDepth([
+            { point: segment.from, z: row.z1 }, { point: segment.to, z: row.z1 },
+            { point: segment.to, z: row.z2 }, { point: segment.from, z: row.z2 },
+          ]),
+          order: .5,
+          element: wallStripElement([bottomA, bottomB, topB, topA], {
+            first: segment.stripIndex === 0,
+            last: segment.stripIndex === segment.stripCount - 1,
+            bottomEdge: row.rowIndex === 0,
+            topEdge: row.rowIndex === row.rowCount - 1,
+            partition: true,
+            wallId: wall.id ?? "",
+          }),
+        });
+      }
     }
   }
   for (const { opening, range } of drawableOpenings) {
@@ -369,7 +416,14 @@ export function renderThreeView(canvas, documentData, options = {}, onSelect = n
     const select = () => onSelect?.("opening", opening);
     panel.addEventListener("click", select);
     panel.addEventListener("keydown", (event) => { if (["Enter", " "].includes(event.key)) select(); });
-    surfaces.push({ depth: (bottomFrom.y + bottomTo.y) / 2, order: 1, element: panel });
+    surfaces.push({
+      depth: averageDepth([
+        { point: opening.from, z: range.bottomCm }, { point: opening.to, z: range.bottomCm },
+        { point: opening.to, z: range.topCm }, { point: opening.from, z: range.topCm },
+      ]),
+      order: 1,
+      element: panel,
+    });
   }
   const boxes = [
     ...(showFeatures ? featureItems : []),
@@ -385,19 +439,46 @@ export function renderThreeView(canvas, documentData, options = {}, onSelect = n
     const className = `three-box three-box-${item.type}${kindClass}${item.vertical.schematic ? " is-schematic" : ""}`;
     for (const index of visibleBoxSideIndexes(depthBase)) {
       const next = (index + 1) % bottom.length;
-      const side = svg("polygon", {
-        class: `${className} three-box-side`,
+      for (const segment of subdivideWallSegment(base[index], base[next], 35, 0)) {
+        for (const row of subdivideVerticalRange(item.vertical.bottomCm, item.vertical.topCm, 45, 0)) {
+          const tile = svg("polygon", {
+            class: `${className} three-box-side three-box-side-tile`,
+            points: pointsValue([
+              project(segment.from, row.z1), project(segment.to, row.z1),
+              project(segment.to, row.z2), project(segment.from, row.z2),
+            ]),
+          });
+          surfaces.push({
+            depth: averageDepth([
+              { point: segment.from, z: row.z1 }, { point: segment.to, z: row.z1 },
+              { point: segment.to, z: row.z2 }, { point: segment.from, z: row.z2 },
+            ]),
+            order: 2,
+            element: makeBoxSurfaceInteractive(tile, item, onSelect),
+          });
+        }
+      }
+      const outline = svg("polygon", {
+        class: `${className} three-box-side-outline`,
         points: pointsValue([bottom[index], bottom[next], top[next], top[index]]),
       });
-      surfaces.push({ depth: (depthBase[index].y + depthBase[next].y) / 2, order: 2, element: makeBoxSurfaceInteractive(side, item, onSelect) });
+      surfaces.push({
+        depth: averageDepth([
+          { point: base[index], z: item.vertical.bottomCm }, { point: base[next], z: item.vertical.bottomCm },
+          { point: base[next], z: item.vertical.topCm }, { point: base[index], z: item.vertical.topCm },
+        ]),
+        order: 2.5,
+        element: outline,
+      });
     }
-    const baseDepth = depthBase.reduce((sum, point) => sum + point.y, 0) / depthBase.length;
+    const topDepth = base.reduce((sum, point) => sum + depthAt(point, item.vertical.topCm), 0) / base.length;
     const topSurface = svg("polygon", { class: `${className} three-box-top`, points: pointsValue(top) });
-    surfaces.push({ depth: baseDepth, order: 3, element: makeBoxSurfaceInteractive(topSurface, item, onSelect, true) });
+    surfaces.push({ depth: topDepth, order: 3, element: makeBoxSurfaceInteractive(topSurface, item, onSelect, true) });
     if (item.type === "feature" && item.kind === "kitchen") {
       for (const component of buildKitchenComponentRects(item)) {
         const element = kitchenComponentElement(component, item.vertical.topCm + .8, project);
-        surfaces.push({ depth: baseDepth, order: 4, element: makeBoxSurfaceInteractive(element, item, onSelect) });
+        const componentCenter = { x: component.x + component.width / 2, y: component.y + component.height / 2 };
+        surfaces.push({ depth: depthAt(componentCenter, item.vertical.topCm + .8), order: 4, element: makeBoxSurfaceInteractive(element, item, onSelect) });
         kitchenComponentCount += 1;
       }
     }

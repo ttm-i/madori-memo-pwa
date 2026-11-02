@@ -246,6 +246,8 @@ button { color: inherit; touch-action: manipulation; }
 .three-box-kind-washer-pan.three-box-side { filter: none; }
 .three-box-furniture { fill: rgba(183,126,86,.72); stroke: #915f3f; }
 .three-box-side { filter: brightness(.88); }
+.three-box-side-tile { stroke: none; }
+.three-box-side-outline { pointer-events: none; fill: none; filter: none; }
 .three-kitchen-component.is-interactive { cursor: pointer; }
 .three-kitchen-component-outer { stroke-width: 1.4; vector-effect: non-scaling-stroke; }
 .three-kitchen-sink .three-kitchen-component-outer { fill: #c8d6d8; stroke: #55777c; }

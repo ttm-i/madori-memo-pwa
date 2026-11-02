@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { alignFurnitureToSupport, analyzeDeliveryRoute, analyzeFurnitureConflicts, analyzeFurniturePlacement, buildElevationItems, buildKitchenComponentRects, buildRoomWalls, buildWallDiagram, countQualities, createSamplePlan, duplicateFurniture, findDeliveryDoorPath, fitsRectangle, FORMAT, getDimensionGroup, getElectricalPlanPosition, moveDimensionGuide, pointInPolygon, rectangleIntersectsPolygon, rectanglesOverlap, resolveFurnitureElevationPlacement, resolveFurnitureVerticalRange, rotateFurniture, snapToGrid, updateFurniture, validatePlan, wallDisplayWidth } from "../dist/model.js";
 import { detailMarkup, gestureExceedsTapThreshold, measurementMetrics, PlanRenderer, snapMeasurementPoint, zoomTransformAround } from "../dist/renderer.js";
-import { featureVerticalRange, isCutawayEdge, openingVerticalRange, projectThreePoint, splitWallFace, subdivideWallRectangle, subdivideWallSegment, threeItemBelongsToRoom, threeLayerEnabled, threeRoomBounds, threeSelectableType, threeWallBelongsToRoom, visibleBoxSideIndexes } from "../dist/three.js";
+import { featureVerticalRange, isCutawayEdge, openingVerticalRange, projectThreeDepth, projectThreePoint, splitWallFace, subdivideVerticalRange, subdivideWallRectangle, subdivideWallRectangleTiles, subdivideWallSegment, threeItemBelongsToRoom, threeLayerEnabled, threeRoomBounds, threeSelectableType, threeWallBelongsToRoom, visibleBoxSideIndexes } from "../dist/three.js";
 
 test("sample plan conforms to the public schema", () => {
   const sample = createSamplePlan();
@@ -352,6 +352,7 @@ test("3D overview projection rotates the plan without changing its scale", () =>
   assert.deepEqual(original, { x: 72, y: 36 });
   assert.deepEqual(rotated, { x: -72, y: 36 });
   assert.equal(projectThreePoint({ x: 300, y: 150 }, bounds, 0, 100).y, -26);
+  assert.ok(projectThreeDepth({ x: 300, y: 150 }, bounds, 0, 100) > projectThreeDepth({ x: 300, y: 150 }, bounds, 0, 0));
 });
 
 test("3D layers default to visible and can be independently hidden", () => {
@@ -424,6 +425,12 @@ test("3D wall strips are subdivided for local depth sorting", () => {
   assert.deepEqual(segments[0].from, { x: 0, y: 0 });
   assert.deepEqual(segments.at(-1).to, { x: 100, y: 0 });
   assert.deepEqual(segments.map(({ stripIndex, stripCount }) => [stripIndex, stripCount]), [[0, 3], [1, 3], [2, 3]]);
+  const rows = subdivideVerticalRange(0, 220, 55);
+  assert.equal(rows.length, 4);
+  assert.equal(rows[0].z1, 0);
+  assert.equal(rows.at(-1).z2, 220);
+  const tiles = subdivideWallRectangleTiles({ u1: 0, u2: 100, z1: 0, z2: 220 }, 35, 55);
+  assert.equal(tiles.length, 12);
 });
 
 test("3D equipment uses measured vertical ranges without making tall closets opaque", () => {
