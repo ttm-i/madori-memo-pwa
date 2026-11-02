@@ -403,7 +403,7 @@ test("3D wall strips are subdivided for local depth sorting", () => {
   assert.equal(rectangles[0].u1, 0);
   assert.equal(rectangles.at(-1).u2, 100);
   assert.deepEqual(rectangles.map(({ stripIndex, stripCount }) => [stripIndex, stripCount]), [[0, 3], [1, 3], [2, 3]]);
-  assert.ok(rectangles.every((rectangle) => rectangle.u2 - rectangle.u1 <= 35));
+  assert.ok(rectangles.every((rectangle) => rectangle.u2 - rectangle.u1 <= 35.4));
   const segments = subdivideWallSegment({ x: 0, y: 0 }, { x: 100, y: 0 }, 35);
   assert.equal(segments.length, 3);
   assert.deepEqual(segments[0].from, { x: 0, y: 0 });

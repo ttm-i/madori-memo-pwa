@@ -1,4 +1,4 @@
-import { featureSupportRange, pointInPolygon, resolveFurnitureVerticalRange } from "./model.js?v=53";
+import { featureSupportRange, pointInPolygon, resolveFurnitureVerticalRange } from "./model.js?v=54";
 
 const NS = "http://www.w3.org/2000/svg";
 
@@ -130,10 +130,11 @@ export function splitWallFace(width, height, cuts) {
 export function subdivideWallRectangle(rectangle, maxWidth = 35) {
   const width = rectangle.u2 - rectangle.u1;
   const count = Math.max(1, Math.ceil(width / maxWidth));
+  const overlap = Math.min(.2, width / count / 10);
   return Array.from({ length: count }, (_, index) => ({
     ...rectangle,
-    u1: rectangle.u1 + width * index / count,
-    u2: rectangle.u1 + width * (index + 1) / count,
+    u1: rectangle.u1 + width * index / count - (index ? overlap : 0),
+    u2: rectangle.u1 + width * (index + 1) / count + (index < count - 1 ? overlap : 0),
     stripIndex: index,
     stripCount: count,
   }));
@@ -143,9 +144,10 @@ export function subdivideWallSegment(from, to, maxLength = 35) {
   const length = Math.hypot(to.x - from.x, to.y - from.y);
   const count = Math.max(1, Math.ceil(length / maxLength));
   const pointAt = (ratio) => ({ x: from.x + (to.x - from.x) * ratio, y: from.y + (to.y - from.y) * ratio });
+  const overlapRatio = length ? Math.min(.2, length / count / 10) / length : 0;
   return Array.from({ length: count }, (_, index) => ({
-    from: pointAt(index / count),
-    to: pointAt((index + 1) / count),
+    from: pointAt(index / count - (index ? overlapRatio : 0)),
+    to: pointAt((index + 1) / count + (index < count - 1 ? overlapRatio : 0)),
     stripIndex: index,
     stripCount: count,
   }));
