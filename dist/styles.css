@@ -208,6 +208,29 @@ button { color: inherit; touch-action: manipulation; }
 .delivery-section-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
 .delivery-section-heading h3 { margin: 0; font-size: .92rem; }
 .delivery-section-heading span { color: var(--muted); font-size: .62rem; }
+.three-view { margin-top: 14px; }
+.three-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 4px 8px; }
+.three-heading h2 { margin: 2px 0 0; font-size: 1.35rem; }
+.three-intro { margin: 0 4px 11px; color: var(--muted); font-size: .73rem; line-height: 1.65; }
+.three-toolbar { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; margin-bottom: 8px; }
+.three-toolbar button { min-height: 38px; border: 1px solid var(--line); border-radius: 11px; background: var(--surface); color: var(--accent); font-size: .7rem; font-weight: 800; }
+.three-canvas-frame { position: relative; overflow: hidden; border: 1px solid var(--line); border-radius: 20px; background: linear-gradient(#f7f4ec,#e8e4da); box-shadow: inset 0 1px 0 rgba(255,255,255,.8); }
+#threeCanvas { display: block; width: 100%; height: auto; min-height: 430px; }
+.three-floor { stroke: #8d9188; stroke-width: 2; }
+.three-room-label { fill: #646a63; font-size: 14px; font-weight: 800; text-anchor: middle; paint-order: stroke; stroke: rgba(255,255,255,.8); stroke-width: 5px; }
+.three-wall { fill: rgba(214,209,196,.78); stroke: #777d75; stroke-width: 1.5; }
+.three-box { stroke-width: 1.5; }
+.three-box-feature { fill: rgba(94,145,127,.76); stroke: #467865; }
+.three-box-furniture { fill: rgba(183,126,86,.72); stroke: #915f3f; }
+.three-box-side { filter: brightness(.82); }
+.three-object-label { fill: #333934; font-size: 11px; font-weight: 800; text-anchor: middle; paint-order: stroke; stroke: rgba(255,255,255,.88); stroke-width: 4px; }
+.three-legend { display: flex; flex-wrap: wrap; gap: 10px 15px; padding: 10px 4px 4px; color: var(--muted); font-size: .64rem; }
+.three-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.three-legend i { width: 11px; height: 11px; border: 1px solid currentColor; border-radius: 3px; }
+.three-legend-wall { background: #d6d1c4; color: #777d75; }
+.three-legend-feature { background: #6b9e89; color: #467865; }
+.three-legend-furniture { background: #bd8763; color: #915f3f; }
+.three-note { margin: 4px; color: #8a633a; font-size: .65rem; line-height: 1.5; }
 .delivery-route-heading { margin: 14px 3px 7px; }
 .delivery-route-heading:first-child { margin-top: 0; }
 .delivery-furniture-list { display: grid; gap: 9px; }

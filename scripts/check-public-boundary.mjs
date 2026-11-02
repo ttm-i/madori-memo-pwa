@@ -25,6 +25,7 @@ const allowedFiles = new Set([
   "renderer.js",
   "styles.css",
   "sw.js",
+  "three.js",
 ]);
 
 async function walk(directory) {

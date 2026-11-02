@@ -10,7 +10,7 @@
     <meta name="description" content="間取りと家具寸法を端末内だけで確認するオフラインPWA" />
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" href="./icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="./styles.css?v=38" />
+    <link rel="stylesheet" href="./styles.css?v=39" />
     <title>間取りメモ</title>
   </head>
   <body>
@@ -206,10 +206,23 @@
           </div>
         </section>
 
-        <section id="threeView" class="view placeholder-view" aria-label="3D表示">
-          <p class="eyebrow">PHASE 3</p>
-          <h2>3D</h2>
-          <p>未測定の天井や壁厚を仮値として区別できる形で追加します。</p>
+        <section id="threeView" class="view three-view" aria-label="概略3D表示">
+          <div class="three-heading">
+            <div><p class="eyebrow">3D OVERVIEW · PHASE 1</p><h2>概略3D</h2></div>
+            <span class="unmeasured-badge">天井高 未測定</span>
+          </div>
+          <p class="three-intro">床形状と家具・設備の位置関係を確認するための軽量表示です。壁の高さと、高さ未登録の家具は模式表示であり、実測値ではありません。</p>
+          <div class="three-toolbar" aria-label="3D表示の向き">
+            <button id="threeRotateLeft" type="button" aria-label="左へ90度回転">↶ 左へ</button>
+            <button id="threeReset" type="button">初期方向</button>
+            <button id="threeRotateRight" type="button" aria-label="右へ90度回転">右へ ↷</button>
+          </div>
+          <div class="three-canvas-frame">
+            <svg id="threeCanvas" viewBox="0 0 900 620" role="img" aria-label="間取りの概略3D"></svg>
+            <div id="threeEmpty" class="wall-empty"><strong>間取りデータがありません</strong><span>JSONを読み込むと概略3Dを表示します。</span></div>
+          </div>
+          <div class="three-legend"><span><i class="three-legend-wall"></i>壁（模式高さ）</span><span><i class="three-legend-feature"></i>設備</span><span><i class="three-legend-furniture"></i>家具</span></div>
+          <p id="threeHeightNote" class="three-note"></p>
         </section>
       </main>
 
@@ -309,7 +322,7 @@
       <input id="fileInput" type="file" accept="application/json,.json" hidden />
       <div id="toast" class="toast" role="status" aria-live="polite"></div>
     </div>
-    <script type="module" src="./app.js?v=38"></script>
+    <script type="module" src="./app.js?v=39"></script>
   </body>
 </html>
 

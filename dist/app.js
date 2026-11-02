@@ -1,6 +1,7 @@
-import { deleteActivePlan, loadActivePlan, saveActivePlan } from "./db.js?v=38";
-import { analyzeDeliveryRoute, analyzeFurnitureConflicts, analyzeFurniturePlacement, buildElevationItems, buildRoomWalls, buildWallDiagram, countQualities, createSamplePlan, DIMENSION_GROUP_LABELS, duplicateFurniture, getDimensionGroup, getElectricalPlanPosition, rotateFurniture, updateFurniture, validatePlan, wallDisplayWidth } from "./model.js?v=38";
-import { detailMarkup, measurementMetrics, PlanRenderer } from "./renderer.js?v=38";
+import { deleteActivePlan, loadActivePlan, saveActivePlan } from "./db.js?v=39";
+import { analyzeDeliveryRoute, analyzeFurnitureConflicts, analyzeFurniturePlacement, buildElevationItems, buildRoomWalls, buildWallDiagram, countQualities, createSamplePlan, DIMENSION_GROUP_LABELS, duplicateFurniture, getDimensionGroup, getElectricalPlanPosition, rotateFurniture, updateFurniture, validatePlan, wallDisplayWidth } from "./model.js?v=39";
+import { detailMarkup, measurementMetrics, PlanRenderer } from "./renderer.js?v=39";
+import { renderThreeView } from "./three.js?v=39";
 
 const elements = Object.fromEntries([
   "menuButton", "dataMenu", "detailDialog", "detailType", "detailTitle", "detailBody", "fileInput",
@@ -25,6 +26,7 @@ const elements = Object.fromEntries([
   "deliveryEmpty", "deliveryContent", "deliveryRouteGrid", "deliveryDoorGrid", "deliveryFurnitureList", "deliveryLimitations",
   "deliveryDialog", "deliveryForm", "deliveryDialogTitle", "cancelDeliveryButton", "deliveryBasis",
   "deliverySideA", "deliverySideB", "deliverySideC",
+  "threeCanvas", "threeEmpty", "threeRotateLeft", "threeRotateRight", "threeReset", "threeHeightNote",
 ].map((id) => [id, document.getElementById(id)]));
 
 let activePlan = null;
@@ -38,12 +40,26 @@ let selectedWallId = null;
 let wallDisplayMode = "diagram";
 let wallViewportMode = "scroll";
 let deliveryFurnitureId = null;
+let threeQuarterTurn = 0;
 const selectableByMode = {
   view: new Set(["room", "dimension", "equipment", "electrical", "furniture"]),
   edit: new Set(["furniture"]),
 };
 const history = [];
 const renderer = new PlanRenderer(elements.planCanvas, elements.viewportLayer, showDetail, handleFurnitureEvent, handleViewChange, handleMeasurementChange);
+
+function updateThreeView() {
+  elements.threeEmpty.hidden = Boolean(activePlan);
+  elements.threeCanvas.hidden = !activePlan;
+  if (!activePlan) {
+    elements.threeHeightNote.textContent = "";
+    return;
+  }
+  const result = renderThreeView(elements.threeCanvas, activePlan, threeQuarterTurn);
+  elements.threeHeightNote.textContent = result.furnitureWithoutHeight
+    ? `高さ未登録の家具 ${result.furnitureWithoutHeight}点は、位置確認用の低い箱として表示しています。`
+    : "家具の高さデータを反映しています。";
+}
 
 function updateUndoButton() {
   elements.undoButton.hidden = history.length === 0;
@@ -714,7 +730,12 @@ document.querySelectorAll(".tab").forEach((tab) => tab.addEventListener("click",
   document.getElementById(`${tab.dataset.view}View`).classList.add("is-active");
   if (tab.dataset.view === "wall") updateWallView();
   if (tab.dataset.view === "delivery") renderDeliveryView();
+  if (tab.dataset.view === "three") updateThreeView();
 }));
+
+elements.threeRotateLeft.addEventListener("click", () => { threeQuarterTurn = (threeQuarterTurn + 3) % 4; updateThreeView(); });
+elements.threeRotateRight.addEventListener("click", () => { threeQuarterTurn = (threeQuarterTurn + 1) % 4; updateThreeView(); });
+elements.threeReset.addEventListener("click", () => { threeQuarterTurn = 0; updateThreeView(); });
 
 elements.wallDiagramModeButton.addEventListener("click", () => setWallDisplayMode("diagram"));
 elements.wallHeightModeButton.addEventListener("click", () => setWallDisplayMode("height"));

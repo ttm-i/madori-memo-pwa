@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { analyzeDeliveryRoute, analyzeFurnitureConflicts, analyzeFurniturePlacement, buildElevationItems, buildRoomWalls, buildWallDiagram, countQualities, createSamplePlan, duplicateFurniture, findDeliveryDoorPath, fitsRectangle, FORMAT, getDimensionGroup, getElectricalPlanPosition, moveDimensionGuide, pointInPolygon, rectanglesOverlap, rotateFurniture, snapToGrid, updateFurniture, validatePlan, wallDisplayWidth } from "../dist/model.js";
 import { buildKitchenComponentRects, detailMarkup, measurementMetrics, PlanRenderer, snapMeasurementPoint, zoomTransformAround } from "../dist/renderer.js";
+import { projectThreePoint } from "../dist/three.js";
 
 test("sample plan conforms to the public schema", () => {
   const sample = createSamplePlan();
@@ -286,6 +287,15 @@ test("zoom keeps the content under the pinch midpoint fixed", () => {
   assert.equal(zoomed.scale, 1);
   assert.equal(zoomed.x + contentPoint.x * zoomed.scale, nextAnchor.x);
   assert.equal(zoomed.y + contentPoint.y * zoomed.scale, nextAnchor.y);
+});
+
+test("3D overview projection rotates the plan without changing its scale", () => {
+  const bounds = { x: 0, y: 0, width: 400, height: 300 };
+  const original = projectThreePoint({ x: 300, y: 150 }, bounds, 0, 0);
+  const rotated = projectThreePoint({ x: 300, y: 150 }, bounds, 1, 0);
+  assert.deepEqual(original, { x: 72, y: 36 });
+  assert.deepEqual(rotated, { x: -72, y: 36 });
+  assert.equal(projectThreePoint({ x: 300, y: 150 }, bounds, 0, 100).y, -26);
 });
 
 test("all app element bindings exist in the HTML", () => {
