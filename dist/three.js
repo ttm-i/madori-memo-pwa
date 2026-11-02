@@ -18,6 +18,14 @@ export function projectThreePoint(point, bounds, quarterTurn = 0, z = 0) {
 
 function pointsValue(points) { return points.map((point) => `${point.x},${point.y}`).join(" "); }
 
+export function visibleBoxSideIndexes(projectedBase) {
+  return projectedBase
+    .map((point, index) => ({ index, depth: (point.y + projectedBase[(index + 1) % projectedBase.length].y) / 2 }))
+    .sort((a, b) => b.depth - a.depth)
+    .slice(0, 2)
+    .map((item) => item.index);
+}
+
 export function renderThreeView(canvas, documentData, quarterTurn = 0) {
   canvas.replaceChildren();
   if (!documentData?.plan) return { rendered: false };
@@ -59,11 +67,14 @@ export function renderThreeView(canvas, documentData, quarterTurn = 0) {
     const top = base.map((point) => project(point, item.displayHeight));
     const bottom = base.map((point) => project(point));
     const className = `three-box three-box-${item.type}`;
-    objectLayer.append(
-      svg("polygon", { class: `${className} three-box-side`, points: pointsValue([bottom[1], bottom[2], top[2], top[1]]) }),
-      svg("polygon", { class: `${className} three-box-side`, points: pointsValue([bottom[2], bottom[3], top[3], top[2]]) }),
-      svg("polygon", { class: `${className} three-box-top`, points: pointsValue(top) }),
-    );
+    for (const index of visibleBoxSideIndexes(bottom)) {
+      const next = (index + 1) % bottom.length;
+      objectLayer.append(svg("polygon", {
+        class: `${className} three-box-side`,
+        points: pointsValue([bottom[index], bottom[next], top[next], top[index]]),
+      }));
+    }
+    objectLayer.append(svg("polygon", { class: `${className} three-box-top`, points: pointsValue(top) }));
     const center = project({ x: item.x + item.width / 2, y: item.y + item.depth / 2 }, item.displayHeight + 8);
     objectLayer.append(svg("text", { class: "three-object-label", x: center.x, y: center.y }, item.name));
   }

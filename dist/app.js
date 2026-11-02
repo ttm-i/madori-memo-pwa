@@ -1,7 +1,7 @@
-import { deleteActivePlan, loadActivePlan, saveActivePlan } from "./db.js?v=39";
-import { analyzeDeliveryRoute, analyzeFurnitureConflicts, analyzeFurniturePlacement, buildElevationItems, buildRoomWalls, buildWallDiagram, countQualities, createSamplePlan, DIMENSION_GROUP_LABELS, duplicateFurniture, getDimensionGroup, getElectricalPlanPosition, rotateFurniture, updateFurniture, validatePlan, wallDisplayWidth } from "./model.js?v=39";
-import { detailMarkup, measurementMetrics, PlanRenderer } from "./renderer.js?v=39";
-import { renderThreeView } from "./three.js?v=39";
+import { deleteActivePlan, loadActivePlan, saveActivePlan } from "./db.js?v=40";
+import { analyzeDeliveryRoute, analyzeFurnitureConflicts, analyzeFurniturePlacement, buildElevationItems, buildRoomWalls, buildWallDiagram, countQualities, createSamplePlan, DIMENSION_GROUP_LABELS, duplicateFurniture, getDimensionGroup, getElectricalPlanPosition, rotateFurniture, updateFurniture, validatePlan, wallDisplayWidth } from "./model.js?v=40";
+import { detailMarkup, measurementMetrics, PlanRenderer } from "./renderer.js?v=40";
+import { renderThreeView } from "./three.js?v=40";
 
 const elements = Object.fromEntries([
   "menuButton", "dataMenu", "detailDialog", "detailType", "detailTitle", "detailBody", "fileInput",

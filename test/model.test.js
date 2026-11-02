@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { analyzeDeliveryRoute, analyzeFurnitureConflicts, analyzeFurniturePlacement, buildElevationItems, buildRoomWalls, buildWallDiagram, countQualities, createSamplePlan, duplicateFurniture, findDeliveryDoorPath, fitsRectangle, FORMAT, getDimensionGroup, getElectricalPlanPosition, moveDimensionGuide, pointInPolygon, rectanglesOverlap, rotateFurniture, snapToGrid, updateFurniture, validatePlan, wallDisplayWidth } from "../dist/model.js";
 import { buildKitchenComponentRects, detailMarkup, measurementMetrics, PlanRenderer, snapMeasurementPoint, zoomTransformAround } from "../dist/renderer.js";
-import { projectThreePoint } from "../dist/three.js";
+import { projectThreePoint, visibleBoxSideIndexes } from "../dist/three.js";
 
 test("sample plan conforms to the public schema", () => {
   const sample = createSamplePlan();
@@ -296,6 +296,16 @@ test("3D overview projection rotates the plan without changing its scale", () =>
   assert.deepEqual(original, { x: 72, y: 36 });
   assert.deepEqual(rotated, { x: -72, y: 36 });
   assert.equal(projectThreePoint({ x: 300, y: 150 }, bounds, 0, 100).y, -26);
+});
+
+test("3D boxes choose the two front faces after every rotation", () => {
+  const bounds = { x: 0, y: 0, width: 400, height: 300 };
+  const base = [{ x: 100, y: 100 }, { x: 200, y: 100 }, { x: 200, y: 200 }, { x: 100, y: 200 }];
+  const initial = visibleBoxSideIndexes(base.map((point) => projectThreePoint(point, bounds, 0)));
+  const rotated = visibleBoxSideIndexes(base.map((point) => projectThreePoint(point, bounds, 1)));
+  assert.equal(initial.length, 2);
+  assert.equal(rotated.length, 2);
+  assert.notDeepEqual(initial, rotated);
 });
 
 test("all app element bindings exist in the HTML", () => {

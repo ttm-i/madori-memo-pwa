@@ -1,13 +1,13 @@
-const CACHE_NAME = "floor-plan-shell-v39";
+const CACHE_NAME = "floor-plan-shell-v40";
 const APP_SHELL = [
   "./",
   "./index.html",
-  "./styles.css?v=39",
-  "./app.js?v=39",
-  "./db.js?v=39",
-  "./model.js?v=39",
-  "./renderer.js?v=39",
-  "./three.js?v=39",
+  "./styles.css?v=40",
+  "./app.js?v=40",
+  "./db.js?v=40",
+  "./model.js?v=40",
+  "./renderer.js?v=40",
+  "./three.js?v=40",
   "./manifest.webmanifest",
   "./icon.svg",
 ];
