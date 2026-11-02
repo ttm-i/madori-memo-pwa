@@ -226,8 +226,10 @@ button { color: inherit; touch-action: manipulation; }
 #threeCanvas { display: block; width: 100%; height: auto; min-height: 430px; }
 .three-floor { stroke: #8d9188; stroke-width: 2; }
 .three-room-label { fill: #646a63; font-size: 14px; font-weight: 800; text-anchor: middle; paint-order: stroke; stroke: rgba(255,255,255,.8); stroke-width: 5px; }
-.three-wall { fill: rgba(224,220,210,.92); stroke: #777d75; stroke-width: 1.5; }
-.three-partition-wall { fill: rgba(215,210,199,.62); stroke: #696f68; stroke-dasharray: 4 2; }
+.three-wall { fill: #e0dcd2; }
+.three-wall-edge { fill: none; stroke: #777d75; stroke-width: 1.5; }
+.three-partition-wall { fill: #d7d2c7; }
+.three-partition-wall-edge { stroke: #696f68; stroke-dasharray: 4 2; }
 .three-opening { cursor: pointer; stroke-width: 2.5; vector-effect: non-scaling-stroke; }
 .three-opening-door { fill: rgba(247,242,232,.08); stroke: #8a6848; }
 .three-opening-window { fill: rgba(130,196,219,.62); stroke: #41778b; }

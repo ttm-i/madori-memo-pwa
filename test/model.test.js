@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { alignFurnitureToSupport, analyzeDeliveryRoute, analyzeFurnitureConflicts, analyzeFurniturePlacement, buildElevationItems, buildRoomWalls, buildWallDiagram, countQualities, createSamplePlan, duplicateFurniture, findDeliveryDoorPath, fitsRectangle, FORMAT, getDimensionGroup, getElectricalPlanPosition, moveDimensionGuide, pointInPolygon, rectanglesOverlap, resolveFurnitureElevationPlacement, resolveFurnitureVerticalRange, rotateFurniture, snapToGrid, updateFurniture, validatePlan, wallDisplayWidth } from "../dist/model.js";
 import { buildKitchenComponentRects, detailMarkup, gestureExceedsTapThreshold, measurementMetrics, PlanRenderer, snapMeasurementPoint, zoomTransformAround } from "../dist/renderer.js";
-import { featureVerticalRange, isCutawayEdge, openingVerticalRange, projectThreePoint, splitWallFace, threeItemBelongsToRoom, threeLayerEnabled, threeRoomBounds, threeWallBelongsToRoom, visibleBoxSideIndexes } from "../dist/three.js";
+import { featureVerticalRange, isCutawayEdge, openingVerticalRange, projectThreePoint, splitWallFace, subdivideWallRectangle, subdivideWallSegment, threeItemBelongsToRoom, threeLayerEnabled, threeRoomBounds, threeWallBelongsToRoom, visibleBoxSideIndexes } from "../dist/three.js";
 
 test("sample plan conforms to the public schema", () => {
   const sample = createSamplePlan();
@@ -395,6 +395,20 @@ test("3D wall faces are split around door and window openings", () => {
     { u1: 100, u2: 180, z1: 199, z2: 220 },
   ]);
   assert.equal(splitWallFace(300, 220, [{ u1: 80, u2: 180, z1: 88, z2: 184.5 }]).length, 4);
+});
+
+test("3D wall strips are subdivided for local depth sorting", () => {
+  const rectangles = subdivideWallRectangle({ u1: 0, u2: 100, z1: 0, z2: 220 }, 35);
+  assert.equal(rectangles.length, 3);
+  assert.equal(rectangles[0].u1, 0);
+  assert.equal(rectangles.at(-1).u2, 100);
+  assert.deepEqual(rectangles.map(({ stripIndex, stripCount }) => [stripIndex, stripCount]), [[0, 3], [1, 3], [2, 3]]);
+  assert.ok(rectangles.every((rectangle) => rectangle.u2 - rectangle.u1 <= 35));
+  const segments = subdivideWallSegment({ x: 0, y: 0 }, { x: 100, y: 0 }, 35);
+  assert.equal(segments.length, 3);
+  assert.deepEqual(segments[0].from, { x: 0, y: 0 });
+  assert.deepEqual(segments.at(-1).to, { x: 100, y: 0 });
+  assert.deepEqual(segments.map(({ stripIndex, stripCount }) => [stripIndex, stripCount]), [[0, 3], [1, 3], [2, 3]]);
 });
 
 test("3D equipment uses measured vertical ranges without making tall closets opaque", () => {

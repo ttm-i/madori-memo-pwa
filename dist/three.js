@@ -1,4 +1,4 @@
-import { featureSupportRange, pointInPolygon, resolveFurnitureVerticalRange } from "./model.js?v=52";
+import { featureSupportRange, pointInPolygon, resolveFurnitureVerticalRange } from "./model.js?v=53";
 
 const NS = "http://www.w3.org/2000/svg";
 
@@ -19,6 +19,18 @@ export function projectThreePoint(point, bounds, quarterTurn = 0, z = 0) {
 }
 
 function pointsValue(points) { return points.map((point) => `${point.x},${point.y}`).join(" "); }
+
+function wallStripElement(points, { first = true, last = true, partition = false, wallId = "" } = {}) {
+  const group = svg("g", { class: "three-wall-surface", "data-wall-id": wallId });
+  const variant = partition ? " three-partition-wall" : "";
+  group.append(svg("polygon", { class: `three-wall three-wall-fill${variant}`, points: pointsValue(points) }));
+  const edgeClass = `three-wall-edge${partition ? " three-partition-wall-edge" : ""}`;
+  group.append(svg("polyline", { class: edgeClass, points: pointsValue([points[0], points[1]]) }));
+  group.append(svg("polyline", { class: edgeClass, points: pointsValue([points[3], points[2]]) }));
+  if (first) group.append(svg("polyline", { class: edgeClass, points: pointsValue([points[0], points[3]]) }));
+  if (last) group.append(svg("polyline", { class: edgeClass, points: pointsValue([points[1], points[2]]) }));
+  return group;
+}
 
 export function threeLayerEnabled(layer, options = {}) { return options[layer] !== false; }
 
@@ -115,6 +127,30 @@ export function splitWallFace(width, height, cuts) {
   return rectangles;
 }
 
+export function subdivideWallRectangle(rectangle, maxWidth = 35) {
+  const width = rectangle.u2 - rectangle.u1;
+  const count = Math.max(1, Math.ceil(width / maxWidth));
+  return Array.from({ length: count }, (_, index) => ({
+    ...rectangle,
+    u1: rectangle.u1 + width * index / count,
+    u2: rectangle.u1 + width * (index + 1) / count,
+    stripIndex: index,
+    stripCount: count,
+  }));
+}
+
+export function subdivideWallSegment(from, to, maxLength = 35) {
+  const length = Math.hypot(to.x - from.x, to.y - from.y);
+  const count = Math.max(1, Math.ceil(length / maxLength));
+  const pointAt = (ratio) => ({ x: from.x + (to.x - from.x) * ratio, y: from.y + (to.y - from.y) * ratio });
+  return Array.from({ length: count }, (_, index) => ({
+    from: pointAt(index / count),
+    to: pointAt((index + 1) / count),
+    stripIndex: index,
+    stripCount: count,
+  }));
+}
+
 function openingCutForEdge(opening, room, edgeIndex, wallHeight) {
   const roomIds = opening.roomIds ?? [opening.roomId];
   if (!roomIds.includes(room.id)) return null;
@@ -201,30 +237,40 @@ export function renderThreeView(canvas, documentData, options = {}, onOpeningSel
       const cuts = drawableOpenings.map(({ opening }) => openingCutForEdge(opening, room, index, wallDisplayHeight)).filter(Boolean);
       cuts.forEach((cut) => cutOpeningIds.add(cut.opening.id));
       const pointAt = (u) => ({ x: from.x + (to.x - from.x) * u / length, y: from.y + (to.y - from.y) * u / length });
-      for (const rectangle of splitWallFace(length, wallDisplayHeight, cuts)) {
+      for (const rectangle of splitWallFace(length, wallDisplayHeight, cuts).flatMap((item) => subdivideWallRectangle(item))) {
         const bottomA = project(pointAt(rectangle.u1), rectangle.z1);
         const bottomB = project(pointAt(rectangle.u2), rectangle.z1);
         const topB = project(pointAt(rectangle.u2), rectangle.z2);
         const topA = project(pointAt(rectangle.u1), rectangle.z2);
         const depthA = project(pointAt(rectangle.u1)).y; const depthB = project(pointAt(rectangle.u2)).y;
-        if (showWalls) surfaces.push({ depth: (depthA + depthB) / 2, order: 0, element: svg("polygon", { class: "three-wall", points: pointsValue([bottomA, bottomB, topB, topA]) }) });
+        if (showWalls) surfaces.push({
+          depth: (depthA + depthB) / 2,
+          order: 0,
+          element: wallStripElement([bottomA, bottomB, topB, topA], {
+            first: rectangle.stripIndex === 0,
+            last: rectangle.stripIndex === rectangle.stripCount - 1,
+          }),
+        });
       }
     });
   }
   for (const wall of partitionWalls) {
     if (!showWalls) break;
     if (!wall.from || !wall.to) continue;
-    const bottomA = project(wall.from); const bottomB = project(wall.to);
-    const topA = project(wall.from, wallDisplayHeight); const topB = project(wall.to, wallDisplayHeight);
-    surfaces.push({
-      depth: (bottomA.y + bottomB.y) / 2,
-      order: .5,
-      element: svg("polygon", {
-        class: "three-wall three-partition-wall",
-        points: pointsValue([bottomA, bottomB, topB, topA]),
-        "data-wall-id": wall.id ?? "",
-      }),
-    });
+    for (const segment of subdivideWallSegment(wall.from, wall.to)) {
+      const bottomA = project(segment.from); const bottomB = project(segment.to);
+      const topA = project(segment.from, wallDisplayHeight); const topB = project(segment.to, wallDisplayHeight);
+      surfaces.push({
+        depth: (bottomA.y + bottomB.y) / 2,
+        order: .5,
+        element: wallStripElement([bottomA, bottomB, topB, topA], {
+          first: segment.stripIndex === 0,
+          last: segment.stripIndex === segment.stripCount - 1,
+          partition: true,
+          wallId: wall.id ?? "",
+        }),
+      });
+    }
   }
   for (const { opening, range } of drawableOpenings) {
     if (!showOpenings) break;
