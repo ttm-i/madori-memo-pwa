@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { alignFurnitureToSupport, analyzeDeliveryRoute, analyzeFurnitureConflicts, analyzeFurniturePlacement, buildElevationItems, buildRoomWalls, buildWallDiagram, countQualities, createSamplePlan, duplicateFurniture, findDeliveryDoorPath, fitsRectangle, FORMAT, getDimensionGroup, getElectricalPlanPosition, moveDimensionGuide, pointInPolygon, rectanglesOverlap, resolveFurnitureElevationPlacement, resolveFurnitureVerticalRange, rotateFurniture, snapToGrid, updateFurniture, validatePlan, wallDisplayWidth } from "../dist/model.js";
 import { buildKitchenComponentRects, detailMarkup, gestureExceedsTapThreshold, measurementMetrics, PlanRenderer, snapMeasurementPoint, zoomTransformAround } from "../dist/renderer.js";
-import { featureVerticalRange, isCutawayEdge, openingVerticalRange, projectThreePoint, splitWallFace, subdivideWallRectangle, subdivideWallSegment, threeItemBelongsToRoom, threeLayerEnabled, threeRoomBounds, threeWallBelongsToRoom, visibleBoxSideIndexes } from "../dist/three.js";
+import { featureVerticalRange, isCutawayEdge, openingVerticalRange, projectThreePoint, splitWallFace, subdivideWallRectangle, subdivideWallSegment, threeItemBelongsToRoom, threeLayerEnabled, threeRoomBounds, threeSelectableType, threeWallBelongsToRoom, visibleBoxSideIndexes } from "../dist/three.js";
 
 test("sample plan conforms to the public schema", () => {
   const sample = createSamplePlan();
@@ -350,6 +350,12 @@ test("3D layers default to visible and can be independently hidden", () => {
   assert.equal(threeLayerEnabled("walls", {}), true);
   assert.equal(threeLayerEnabled("walls", { walls: false, furniture: true }), false);
   assert.equal(threeLayerEnabled("furniture", { walls: false, furniture: true }), true);
+});
+
+test("3D equipment and furniture expose their matching detail types", () => {
+  assert.equal(threeSelectableType({ type: "feature" }), "feature");
+  assert.equal(threeSelectableType({ type: "furniture" }), "furniture");
+  assert.equal(threeSelectableType({ type: "wall" }), null);
 });
 
 test("3D room focus filters room-owned items and recalculates its bounds", () => {

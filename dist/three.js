@@ -1,4 +1,4 @@
-import { featureSupportRange, pointInPolygon, resolveFurnitureVerticalRange } from "./model.js?v=54";
+import { featureSupportRange, pointInPolygon, resolveFurnitureVerticalRange } from "./model.js?v=55";
 
 const NS = "http://www.w3.org/2000/svg";
 
@@ -33,6 +33,26 @@ function wallStripElement(points, { first = true, last = true, partition = false
 }
 
 export function threeLayerEnabled(layer, options = {}) { return options[layer] !== false; }
+
+export function threeSelectableType(item) {
+  return item?.type === "feature" || item?.type === "furniture" ? item.type : null;
+}
+
+function makeBoxSurfaceInteractive(element, item, onSelect, keyboard = false) {
+  const type = threeSelectableType(item);
+  if (!type || !onSelect) return element;
+  element.classList.add("is-interactive");
+  element.setAttribute("data-item-id", item.id ?? "");
+  if (keyboard) {
+    element.setAttribute("role", "button");
+    element.setAttribute("tabindex", "0");
+    element.setAttribute("aria-label", `${item.name}の詳細を表示`);
+  }
+  const select = (event) => { event.stopPropagation(); onSelect(type, item); };
+  element.addEventListener("click", select);
+  if (keyboard) element.addEventListener("keydown", (event) => { if (["Enter", " "].includes(event.key)) select(event); });
+  return element;
+}
 
 export function threeItemBelongsToRoom(item, roomId) {
   if (!roomId) return true;
@@ -185,7 +205,7 @@ function openingIsOnCutawayEdge(opening, rooms, quarterTurn) {
   return closest.index >= 0 && isCutawayEdge(room.points, closest.index, quarterTurn);
 }
 
-export function renderThreeView(canvas, documentData, options = {}, onOpeningSelect = null) {
+export function renderThreeView(canvas, documentData, options = {}, onSelect = null) {
   canvas.replaceChildren();
   if (!documentData?.plan) return { rendered: false };
   const quarterTurn = options.quarterTurn ?? 0;
@@ -289,7 +309,7 @@ export function renderThreeView(canvas, documentData, options = {}, onOpeningSel
       tabindex: 0,
       "aria-label": `${opening.name}の詳細を表示`,
     });
-    const select = () => onOpeningSelect?.(opening);
+    const select = () => onSelect?.("opening", opening);
     panel.addEventListener("click", select);
     panel.addEventListener("keydown", (event) => { if (["Enter", " "].includes(event.key)) select(); });
     surfaces.push({ depth: (bottomFrom.y + bottomTo.y) / 2, order: 1, element: panel });
@@ -308,13 +328,15 @@ export function renderThreeView(canvas, documentData, options = {}, onOpeningSel
     const className = `three-box three-box-${item.type}${kindClass}${item.vertical.schematic ? " is-schematic" : ""}`;
     for (const index of visibleBoxSideIndexes(depthBase)) {
       const next = (index + 1) % bottom.length;
-      surfaces.push({ depth: (depthBase[index].y + depthBase[next].y) / 2, order: 2, element: svg("polygon", {
+      const side = svg("polygon", {
         class: `${className} three-box-side`,
         points: pointsValue([bottom[index], bottom[next], top[next], top[index]]),
-      }) });
+      });
+      surfaces.push({ depth: (depthBase[index].y + depthBase[next].y) / 2, order: 2, element: makeBoxSurfaceInteractive(side, item, onSelect) });
     }
     const baseDepth = depthBase.reduce((sum, point) => sum + point.y, 0) / depthBase.length;
-    surfaces.push({ depth: baseDepth, order: 3, element: svg("polygon", { class: `${className} three-box-top`, points: pointsValue(top) }) });
+    const topSurface = svg("polygon", { class: `${className} three-box-top`, points: pointsValue(top) });
+    surfaces.push({ depth: baseDepth, order: 3, element: makeBoxSurfaceInteractive(topSurface, item, onSelect, true) });
     if (showLabels) {
       const center = project({ x: item.x + item.width / 2, y: item.y + item.depth / 2 }, item.vertical.topCm + 8);
       labelLayer.append(svg("text", { class: "three-object-label", x: center.x, y: center.y }, item.name));

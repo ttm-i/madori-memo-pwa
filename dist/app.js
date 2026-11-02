@@ -1,7 +1,7 @@
-import { deleteActivePlan, loadActivePlan, saveActivePlan } from "./db.js?v=54";
-import { alignFurnitureToSupport, alignSupportedFurniture, analyzeDeliveryRoute, analyzeFurnitureConflicts, analyzeFurniturePlacement, buildElevationItems, buildRoomWalls, buildWallDiagram, countQualities, createSamplePlan, DIMENSION_GROUP_LABELS, duplicateFurniture, findSupportItem, getDimensionGroup, getElectricalPlanPosition, resolveFurnitureVerticalRange, rotateFurniture, updateFurniture, validatePlan, wallDisplayWidth } from "./model.js?v=54";
-import { detailMarkup, measurementMetrics, PlanRenderer } from "./renderer.js?v=54";
-import { renderThreeView } from "./three.js?v=54";
+import { deleteActivePlan, loadActivePlan, saveActivePlan } from "./db.js?v=55";
+import { alignFurnitureToSupport, alignSupportedFurniture, analyzeDeliveryRoute, analyzeFurnitureConflicts, analyzeFurniturePlacement, buildElevationItems, buildRoomWalls, buildWallDiagram, countQualities, createSamplePlan, DIMENSION_GROUP_LABELS, duplicateFurniture, findSupportItem, getDimensionGroup, getElectricalPlanPosition, resolveFurnitureVerticalRange, rotateFurniture, updateFurniture, validatePlan, wallDisplayWidth } from "./model.js?v=55";
+import { detailMarkup, measurementMetrics, PlanRenderer } from "./renderer.js?v=55";
+import { renderThreeView } from "./three.js?v=55";
 
 const elements = Object.fromEntries([
   "menuButton", "dataMenu", "detailDialog", "detailType", "detailTitle", "detailBody", "fileInput",
@@ -67,7 +67,7 @@ function updateThreeView() {
     showLabels: threeShowLabels,
     roomId: threeRoomId || null,
     ...threeLayers,
-  }, (opening) => showDetail("opening", opening));
+  }, (type, item) => showDetail(type, item));
   const scope = result.selectedRoomName ? `${result.selectedRoomName}を表示中。` : "全体を表示中。";
   const notes = [`${scope} ドア・窓 ${result.openingCount}点のうち ${result.cutOpeningCount}点を壁の開口として反映。間仕切り壁 ${result.partitionWallCount}点。壁上端は天井位置ではありません。`];
   notes.push(result.furnitureWithoutHeight
@@ -708,6 +708,7 @@ elements.detailDialog.addEventListener("close", () => {
 elements.showFurnitureClearanceButton.addEventListener("click", () => {
   if (!selectedFurniture()) return;
   preserveFurnitureSelectionOnClose = true;
+  document.querySelector('.tab[data-view="plan"]').click();
   elements.detailDialog.close();
   showToast("空白部分をタップすると距離表示を終了します");
 });
