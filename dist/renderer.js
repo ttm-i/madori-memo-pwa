@@ -1,4 +1,4 @@
-import { analyzeFurnitureConflicts, analyzeFurniturePlacement, findSupportItem, getDimensionGroup, getElectricalPlanPosition, moveDimensionGuide, QUALITY_LABELS, snapToGrid } from "./model.js?v=48";
+import { analyzeFurnitureConflicts, analyzeFurniturePlacement, findSupportItem, getDimensionGroup, getElectricalPlanPosition, moveDimensionGuide, QUALITY_LABELS, snapToGrid } from "./model.js?v=49";
 
 const NS = "http://www.w3.org/2000/svg";
 
@@ -66,6 +66,10 @@ export function zoomTransformAround(transform, previousAnchor, nextAnchor, facto
   };
 }
 
+export function gestureExceedsTapThreshold(start, current, threshold = 5) {
+  return Math.hypot(current.x - start.x, current.y - start.y) >= threshold;
+}
+
 export function buildKitchenComponentRects(feature) {
   const segments = feature?.horizontalSegmentsCm;
   const depths = feature?.depthDetailsCm;
@@ -116,7 +120,20 @@ export class PlanRenderer {
     this.dimensionGroups = null;
     this.selectableTypes = new Set(["room", "dimension", "equipment", "electrical", "furniture"]);
     this.suppressNextClick = false;
+    this.selectionSuppressedUntil = 0;
     this.bindGestures();
+  }
+
+  suppressSelection(durationMs = 250) {
+    this.suppressNextClick = true;
+    this.selectionSuppressedUntil = Math.max(this.selectionSuppressedUntil, Date.now() + durationMs);
+    setTimeout(() => {
+      if (Date.now() >= this.selectionSuppressedUntil) this.suppressNextClick = false;
+    }, durationMs + 10);
+  }
+
+  selectionIsSuppressed() {
+    return this.suppressNextClick || Date.now() < this.selectionSuppressedUntil;
   }
 
   render(documentData) {
@@ -523,8 +540,11 @@ export class PlanRenderer {
     this.pointers.set(active.pointerId, {
       x: active.lastClientX ?? active.clientX,
       y: active.lastClientY ?? active.clientY,
+      startX: active.clientX,
+      startY: active.clientY,
+      moved: false,
     });
-    this.pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    this.pointers.set(event.pointerId, { x: event.clientX, y: event.clientY, startX: event.clientX, startY: event.clientY, moved: false });
     this.measurementPointer = null;
     this.draggingMeasurement = null;
     this.updateMeasurementOverlay();
@@ -532,6 +552,17 @@ export class PlanRenderer {
   }
 
   bindGestures() {
+    this.svg.addEventListener("click", (event) => {
+      if (!this.selectionIsSuppressed()) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      this.suppressNextClick = false;
+      this.selectionSuppressedUntil = 0;
+    }, true);
+    this.svg.addEventListener("click", (event) => {
+      const selectionTarget = event.target.closest?.(".room-shape,.opening-line,.feature,.electrical-marker,.furniture-group,.dimension,.measurement-handle");
+      if (!selectionTarget || selectionTarget.closest?.(".not-selectable")) this.onSelect?.(null, null);
+    });
     this.svg.addEventListener("pointerdown", (event) => {
       if (this.measurementMode) {
         event.preventDefault();
@@ -555,7 +586,7 @@ export class PlanRenderer {
         return;
       }
       event.target.setPointerCapture?.(event.pointerId);
-      this.pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      this.pointers.set(event.pointerId, { x: event.clientX, y: event.clientY, startX: event.clientX, startY: event.clientY, moved: false });
     });
     this.svg.addEventListener("pointermove", (event) => {
       if (this.draggingMeasurement?.pointerId === event.pointerId) {
@@ -630,7 +661,15 @@ export class PlanRenderer {
       if (!this.pointers.has(event.pointerId)) return;
       const previous = this.pointers.get(event.pointerId);
       const previousValues = [...this.pointers.values()];
-      this.pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      this.pointers.set(event.pointerId, {
+        ...previous,
+        x: event.clientX,
+        y: event.clientY,
+        moved: previous.moved || gestureExceedsTapThreshold(
+          { x: previous.startX, y: previous.startY },
+          { x: event.clientX, y: event.clientY },
+        ),
+      });
       const values = [...this.pointers.values()];
       if (values.length === 1) {
         const rect = this.svg.getBoundingClientRect();
@@ -677,8 +716,7 @@ export class PlanRenderer {
         const moved = this.draggingFurniture.moved;
         this.draggingFurniture = null;
         if (moved) {
-          this.suppressNextClick = true;
-          setTimeout(() => { this.suppressNextClick = false; }, 0);
+          this.suppressSelection();
           this.onFurnitureEvent?.("commit");
         }
         return;
@@ -687,14 +725,15 @@ export class PlanRenderer {
         const drag = this.draggingDimension;
         this.draggingDimension = null;
         if (!drag.moved) return;
-        this.suppressNextClick = true;
-        setTimeout(() => { this.suppressNextClick = false; }, 0);
+        this.suppressSelection();
         moveDimensionGuide(drag.dimension, Math.round(drag.offset * 10) / 10);
         this.render(this.document);
         this.onFurnitureEvent?.("commit");
         return;
       }
+      const pointer = this.pointers.get(event.pointerId);
       this.pointers.delete(event.pointerId);
+      if (pointer?.moved) this.suppressSelection();
     };
     this.svg.addEventListener("pointerup", release);
     this.svg.addEventListener("pointercancel", release);

@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { alignFurnitureToSupport, analyzeDeliveryRoute, analyzeFurnitureConflicts, analyzeFurniturePlacement, buildElevationItems, buildRoomWalls, buildWallDiagram, countQualities, createSamplePlan, duplicateFurniture, findDeliveryDoorPath, fitsRectangle, FORMAT, getDimensionGroup, getElectricalPlanPosition, moveDimensionGuide, pointInPolygon, rectanglesOverlap, resolveFurnitureElevationPlacement, resolveFurnitureVerticalRange, rotateFurniture, snapToGrid, updateFurniture, validatePlan, wallDisplayWidth } from "../dist/model.js";
-import { buildKitchenComponentRects, detailMarkup, measurementMetrics, PlanRenderer, snapMeasurementPoint, zoomTransformAround } from "../dist/renderer.js";
+import { buildKitchenComponentRects, detailMarkup, gestureExceedsTapThreshold, measurementMetrics, PlanRenderer, snapMeasurementPoint, zoomTransformAround } from "../dist/renderer.js";
 import { featureVerticalRange, isCutawayEdge, openingVerticalRange, projectThreePoint, splitWallFace, visibleBoxSideIndexes } from "../dist/three.js";
 
 test("sample plan conforms to the public schema", () => {
@@ -228,7 +228,10 @@ test("a second pointer cancels measurement input and becomes a pinch gesture", (
   assert.equal(prevented, true);
   assert.equal(captured, 2);
   assert.deepEqual(renderer.measurement, previousMeasurement);
-  assert.deepEqual([...renderer.pointers.entries()], [[1, { x: 105, y: 125 }], [2, { x: 220, y: 240 }]]);
+  assert.deepEqual([...renderer.pointers.entries()], [
+    [1, { x: 105, y: 125, startX: 100, startY: 120, moved: false }],
+    [2, { x: 220, y: 240, startX: 220, startY: 240, moved: false }],
+  ]);
   assert.equal(renderer.measurementPointer, null);
   assert.equal(overlayUpdates, 1);
 });
@@ -327,6 +330,11 @@ test("zoom keeps the content under the pinch midpoint fixed", () => {
   assert.equal(zoomed.scale, 1);
   assert.equal(zoomed.x + contentPoint.x * zoomed.scale, nextAnchor.x);
   assert.equal(zoomed.y + contentPoint.y * zoomed.scale, nextAnchor.y);
+});
+
+test("gesture movement distinguishes a pan from a tap", () => {
+  assert.equal(gestureExceedsTapThreshold({ x: 10, y: 10 }, { x: 13, y: 13 }), false);
+  assert.equal(gestureExceedsTapThreshold({ x: 10, y: 10 }, { x: 14, y: 13 }), true);
 });
 
 test("3D overview projection rotates the plan without changing its scale", () => {

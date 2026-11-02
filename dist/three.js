@@ -1,4 +1,4 @@
-import { featureSupportRange, resolveFurnitureVerticalRange } from "./model.js?v=48";
+import { featureSupportRange, resolveFurnitureVerticalRange } from "./model.js?v=49";
 
 const NS = "http://www.w3.org/2000/svg";
 

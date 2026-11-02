@@ -1,7 +1,7 @@
-import { deleteActivePlan, loadActivePlan, saveActivePlan } from "./db.js?v=48";
-import { alignFurnitureToSupport, alignSupportedFurniture, analyzeDeliveryRoute, analyzeFurnitureConflicts, analyzeFurniturePlacement, buildElevationItems, buildRoomWalls, buildWallDiagram, countQualities, createSamplePlan, DIMENSION_GROUP_LABELS, duplicateFurniture, findSupportItem, getDimensionGroup, getElectricalPlanPosition, resolveFurnitureVerticalRange, rotateFurniture, updateFurniture, validatePlan, wallDisplayWidth } from "./model.js?v=48";
-import { detailMarkup, measurementMetrics, PlanRenderer } from "./renderer.js?v=48";
-import { renderThreeView } from "./three.js?v=48";
+import { deleteActivePlan, loadActivePlan, saveActivePlan } from "./db.js?v=49";
+import { alignFurnitureToSupport, alignSupportedFurniture, analyzeDeliveryRoute, analyzeFurnitureConflicts, analyzeFurniturePlacement, buildElevationItems, buildRoomWalls, buildWallDiagram, countQualities, createSamplePlan, DIMENSION_GROUP_LABELS, duplicateFurniture, findSupportItem, getDimensionGroup, getElectricalPlanPosition, resolveFurnitureVerticalRange, rotateFurniture, updateFurniture, validatePlan, wallDisplayWidth } from "./model.js?v=49";
+import { detailMarkup, measurementMetrics, PlanRenderer } from "./renderer.js?v=49";
+import { renderThreeView } from "./three.js?v=49";
 
 const elements = Object.fromEntries([
   "menuButton", "dataMenu", "detailDialog", "detailType", "detailTitle", "detailBody", "fileInput",
@@ -646,6 +646,12 @@ function exportPlan() {
 }
 
 function showDetail(type, item) {
+  if (!type || !item) {
+    selectedFurnitureId = null;
+    renderer.setSelectedFurniture(null);
+    if (elements.detailDialog.open) elements.detailDialog.close();
+    return;
+  }
   selectedFurnitureId = type === "furniture" ? item.id : null;
   renderer.setSelectedFurniture(selectedFurnitureId);
   const furnitureEditable = type === "furniture" && !locked;
@@ -669,6 +675,14 @@ function showDetail(type, item) {
   }
   elements.detailDialog.showModal();
 }
+
+elements.detailDialog.addEventListener("click", (event) => {
+  if (event.target === elements.detailDialog) elements.detailDialog.close();
+});
+elements.detailDialog.addEventListener("close", () => {
+  selectedFurnitureId = null;
+  renderer.setSelectedFurniture(null);
+});
 
 function selectedFurniture() {
   return activePlan?.plan.furniture.find((item) => item.id === selectedFurnitureId);
