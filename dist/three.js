@@ -1,4 +1,4 @@
-import { buildKitchenComponentRects, featureSupportRange, pointInPolygon, resolveFurnitureVerticalRange } from "./model.js?v=63";
+import { buildKitchenComponentRects, featureSupportRange, pointInPolygon, resolveFurnitureVerticalRange } from "./model.js?v=64";
 
 const NS = "http://www.w3.org/2000/svg";
 
@@ -116,6 +116,11 @@ export function threeRoomBounds(rooms, fallback = { x: 0, y: 0, width: 1, height
   const minY = Math.min(...points.map((point) => point.y));
   const maxY = Math.max(...points.map((point) => point.y));
   return { x: minX, y: minY, width: Math.max(1, maxX - minX), height: Math.max(1, maxY - minY) };
+}
+
+export function yawToQuarterTurn(yaw) {
+  const turn = Math.round((yaw + Math.PI / 4) / (Math.PI / 2));
+  return ((turn % 4) + 4) % 4;
 }
 
 export function threeWallBelongsToRoom(wall, room) {

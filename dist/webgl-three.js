@@ -1,6 +1,6 @@
 import * as THREE from "./vendor/three/three.module.js";
-import { buildKitchenComponentRects, resolveFurnitureVerticalRange } from "./model.js?v=63";
-import { featureVerticalRange, isCutawayEdge, openingVerticalRange, splitWallFace, threeItemBelongsToRoom, threeRoomBounds, threeWallBelongsToRoom } from "./three.js?v=63";
+import { buildKitchenComponentRects, resolveFurnitureVerticalRange } from "./model.js?v=64";
+import { featureVerticalRange, isCutawayEdge, openingVerticalRange, splitWallFace, threeItemBelongsToRoom, threeRoomBounds, threeWallBelongsToRoom, yawToQuarterTurn } from "./three.js?v=64";
 
 const WALL_THICKNESS = 6;
 const DEFAULT_WALL_HEIGHT = 220;
@@ -19,6 +19,7 @@ function material(color, { opacity = 1, roughness = .82, metalness = 0 } = {}) {
     color,
     opacity,
     transparent: opacity < 1,
+    depthWrite: opacity >= 1,
     roughness,
     metalness,
     side: THREE.DoubleSide,
@@ -98,7 +99,7 @@ function roomFloor(room) {
   shape.closePath();
   const mesh = new THREE.Mesh(
     new THREE.ShapeGeometry(shape),
-    material(room.color ?? "#e9e4d8", { opacity: .9, roughness: 1 }),
+    material(room.color ?? "#e9e4d8", { roughness: 1 }),
   );
   mesh.rotation.x = Math.PI / 2;
   mesh.position.y = -.8;
@@ -111,7 +112,8 @@ function boxObject(item, vertical, color, type) {
   const depth = item.depth ?? item.depthCm ?? item.height;
   if (![item.x, item.y, width, depth, vertical.bottomCm, vertical.topCm].every(Number.isFinite)) return null;
   const height = Math.max(1.5, vertical.topCm - vertical.bottomCm);
-  const mesh = new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), material(color, { opacity: vertical.schematic ? .62 : .88 }));
+  const displayColor = vertical.schematic ? new THREE.Color(color).lerp(new THREE.Color(0xffffff), .28) : color;
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), material(displayColor));
   mesh.position.set(item.x + width / 2, vertical.bottomCm + height / 2, item.y + depth / 2);
   mesh.castShadow = true;
   mesh.receiveShadow = true;
@@ -195,7 +197,7 @@ function buildScene(root, documentData, options) {
           rectangle.z1,
           rectangle.z2,
           WALL_THICKNESS,
-          material(0xdedbd1, { opacity: .78, roughness: 1 }),
+          material(0xdedbd1, { roughness: 1 }),
         );
         wall.receiveShadow = true;
         addOutline(wall, 0x7c817b, .42);
@@ -210,7 +212,7 @@ function buildScene(root, documentData, options) {
       for (let index = 0; index < points.length - (wall.points?.length >= 3 ? 0 : 1); index += 1) {
         const from = points[index];
         const to = points[(index + 1) % points.length];
-        const mesh = segmentBox(from, to, 0, wallHeight, WALL_THICKNESS, material(0xd6d3ca, { opacity: .84 }));
+        const mesh = segmentBox(from, to, 0, wallHeight, WALL_THICKNESS, material(0xd6d3ca));
         mesh.receiveShadow = true;
         addOutline(mesh, 0x70766f, .5);
         root.add(mesh);
@@ -227,8 +229,9 @@ function buildScene(root, documentData, options) {
         range.bottomCm,
         range.topCm,
         2.5,
-        material(range.isWindow ? 0x69b7d3 : 0xf8f3e9, { opacity: range.isWindow ? .56 : .94, roughness: .45 }),
+        material(range.isWindow ? 0x69b7d3 : 0xf8f3e9, { opacity: range.isWindow ? .5 : 1, roughness: .45 }),
       );
+      pane.renderOrder = range.isWindow ? 3 : 1;
       addOutline(pane, range.isWindow ? 0x26718d : 0x805936, .9);
       root.add(markSelectable(pane, "opening", opening));
     }
@@ -280,7 +283,8 @@ export function createWebGLThreeView(canvas, onSelect = null) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: "high-performance" });
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.setClearColor(0xf3efe6, 1);
-  renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+  const coarsePointer = window.matchMedia?.("(pointer: coarse)")?.matches;
+  renderer.setPixelRatio(Math.min(coarsePointer ? 1.5 : 2, window.devicePixelRatio || 1));
   const scene = new THREE.Scene();
   scene.fog = new THREE.Fog(0xf3efe6, 900, 2300);
   const camera = new THREE.OrthographicCamera(-500, 500, 350, -350, 1, 4000);
@@ -298,6 +302,9 @@ export function createWebGLThreeView(canvas, onSelect = null) {
   let frameRequested = false;
   let pinchStart = null;
   let usedMultiplePointers = false;
+  let currentDocument = null;
+  let currentOptions = {};
+  let builtCutawayTurn = 0;
 
   function requestRender() {
     if (frameRequested) return;
@@ -347,7 +354,20 @@ export function createWebGLThreeView(canvas, onSelect = null) {
     view.yaw = -Math.PI / 4 + quarterTurn * Math.PI / 2;
     view.pitch = .72;
     view.zoom = 1;
+    rebuildScene();
+  }
+
+  function rebuildScene() {
+    if (!currentDocument) {
+      requestRender();
+      return sceneInfo;
+    }
+    disposeObject(root);
+    root.clear();
+    builtCutawayTurn = yawToQuarterTurn(view.yaw);
+    sceneInfo = buildScene(root, currentDocument, { ...currentOptions, quarterTurn: builtCutawayTurn });
     requestRender();
+    return sceneInfo;
   }
 
   function pick(clientX, clientY) {
@@ -402,6 +422,10 @@ export function createWebGLThreeView(canvas, onSelect = null) {
       pinchStart = null;
       usedMultiplePointers = false;
     }
+    if (current?.moved && currentOptions.cutaway !== false) {
+      const nextCutawayTurn = yawToQuarterTurn(view.yaw);
+      if (nextCutawayTurn !== builtCutawayTurn) rebuildScene();
+    }
     if (shouldPick) pick(event.clientX, event.clientY);
   }
 
@@ -422,11 +446,9 @@ export function createWebGLThreeView(canvas, onSelect = null) {
         view.yaw += (difference === 3 ? -1 : difference) * Math.PI / 2;
         view.quarterTurn = options.quarterTurn ?? 0;
       }
-      disposeObject(root);
-      root.clear();
-      sceneInfo = buildScene(root, documentData, options);
-      requestRender();
-      return sceneInfo;
+      currentDocument = documentData;
+      currentOptions = { ...options };
+      return rebuildScene();
     },
     getZoom: () => view.zoom,
     setZoom,

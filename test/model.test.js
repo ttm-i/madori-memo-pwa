@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { alignFurnitureToSupport, analyzeDeliveryRoute, analyzeFurnitureConflicts, analyzeFurniturePlacement, buildElevationItems, buildKitchenComponentRects, buildRoomWalls, buildWallDiagram, countQualities, createSamplePlan, duplicateFurniture, findDeliveryDoorPath, fitsRectangle, FORMAT, getDimensionGroup, getElectricalPlanPosition, moveDimensionGuide, pointInPolygon, rectangleIntersectsPolygon, rectanglesOverlap, resolveFurnitureElevationPlacement, resolveFurnitureVerticalRange, rotateFurniture, snapToGrid, updateFurniture, validatePlan, wallDisplayWidth } from "../dist/model.js";
 import { detailMarkup, gestureExceedsTapThreshold, measurementMetrics, PlanRenderer, snapMeasurementPoint, zoomTransformAround } from "../dist/renderer.js";
-import { featureVerticalRange, isCutawayEdge, openingVerticalRange, projectThreeDepth, projectThreePoint, splitWallFace, subdivideVerticalRange, subdivideWallRectangle, subdivideWallRectangleTiles, subdivideWallSegment, threeItemBelongsToRoom, threeLayerEnabled, threeRoomBounds, threeSelectableType, threeViewportBox, threeWallBelongsToRoom, visibleBoxSideIndexes } from "../dist/three.js";
+import { featureVerticalRange, isCutawayEdge, openingVerticalRange, projectThreeDepth, projectThreePoint, splitWallFace, subdivideVerticalRange, subdivideWallRectangle, subdivideWallRectangleTiles, subdivideWallSegment, threeItemBelongsToRoom, threeLayerEnabled, threeRoomBounds, threeSelectableType, threeViewportBox, threeWallBelongsToRoom, visibleBoxSideIndexes, yawToQuarterTurn } from "../dist/three.js";
 
 test("sample plan conforms to the public schema", () => {
   const sample = createSamplePlan();
@@ -408,6 +408,14 @@ test("3D cutaway walls follow the selected viewing direction", () => {
   const room = [{ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 100, y: 100 }, { x: 0, y: 100 }];
   assert.deepEqual(room.map((_, index) => isCutawayEdge(room, index, 0)), [false, true, true, false]);
   assert.deepEqual(room.map((_, index) => isCutawayEdge(room, index, 2)), [true, false, false, true]);
+});
+
+test("WebGL orbit angles choose the nearest cutaway direction", () => {
+  assert.equal(yawToQuarterTurn(-Math.PI / 4), 0);
+  assert.equal(yawToQuarterTurn(Math.PI / 4), 1);
+  assert.equal(yawToQuarterTurn(Math.PI * 3 / 4), 2);
+  assert.equal(yawToQuarterTurn(-Math.PI * 3 / 4), 3);
+  assert.equal(yawToQuarterTurn(Math.PI * 7 / 4), 0);
 });
 
 test("3D wall faces are split around door and window openings", () => {
